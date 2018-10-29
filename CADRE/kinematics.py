@@ -31,7 +31,7 @@ def computepositionrotd(n, vects, mat):
     """
     result = np.empty(vects.shape)
     for i in range(n):
-        result[:, i] = np.dot(mat[:, :, i], vects[:, i])
+        result[i, :] = np.dot(mat[i, :, :], vects[i, :])
     return result
 
 
@@ -43,11 +43,9 @@ def computepositionrotdjacobian(n, v1, O_21):
 
     for k in range(0, 3):
         for v in range(0, 3):
-            J1[:, k, k, v] = v1[v, :]
+            J1[:, k, k, v] = v1[:, v]
 
-    J2 = np.transpose(O_21, (2, 0, 1))
-
-    return J1, J2
+    return J1, O_21
 
 
 def computepositionspherical(n, v):
