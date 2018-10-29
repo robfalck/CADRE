@@ -33,7 +33,7 @@ class Comm_DataDownloaded(rk4.RK4):
         n_times = self.n_times
 
         # Inputs
-        self.add_input('Dr', np.zeros(n_times), units='Gibyte/s',
+        self.add_input('Dr', np.zeros((n_times, )), units='Gibyte/s',
                        desc='Download rate over time')
 
         # Initial State
@@ -41,7 +41,7 @@ class Comm_DataDownloaded(rk4.RK4):
                        desc='Initial downloaded data state')
 
         # States
-        self.add_output('Data', np.zeros((1, n_times)), units='Gibyte',
+        self.add_output('Data', np.zeros((n_times, )), units='Gibyte',
                         desc='Downloaded data state over time')
 
         self.options['state_var'] = 'Data'
@@ -78,7 +78,7 @@ class Comm_AntRotation(ExplicitComponent):
         self.add_input('antAngle', 0.0, units='rad')
 
         # Outputs
-        self.add_output('q_A', np.zeros((4, n)), units=None,
+        self.add_output('q_A', np.zeros((n, 4)), units=None,
                         desc='Quarternion matrix in antenna angle frame over time')
 
         self.dq_dt = np.zeros(4)
@@ -92,10 +92,10 @@ class Comm_AntRotation(ExplicitComponent):
         q_A = outputs['q_A']
 
         rt2 = np.sqrt(2)
-        q_A[0, :] = np.cos(antAngle/2.)
-        q_A[1, :] = np.sin(antAngle/2.) / rt2
-        q_A[2, :] = - np.sin(antAngle/2.) / rt2
-        q_A[3, :] = 0.0
+        q_A[:, 0] = np.cos(antAngle/2.)
+        q_A[:, 1] = np.sin(antAngle/2.) / rt2
+        q_A[:, 2] = - np.sin(antAngle/2.) / rt2
+        q_A[:, 3] = 0.0
 
     def compute_partials(self, inputs, partials):
         """
@@ -117,11 +117,11 @@ class Comm_AntRotation(ExplicitComponent):
         if mode == 'fwd':
             if 'antAngle' in d_inputs:
                 for k in range(4):
-                    d_outputs['q_A'][k, :] += self.dq_dt[k] * d_inputs['antAngle']
+                    d_outputs['q_A'][:, k] += self.dq_dt[k] * d_inputs['antAngle']
         else:
             if 'antAngle' in d_inputs:
                 for k in range(4):
-                    d_inputs['antAngle'] += self.dq_dt[k] * np.sum(d_outputs['q_A'][k, :])
+                    d_inputs['antAngle'] += self.dq_dt[k] * np.sum(d_outputs['q_A'][:, k])
 
 
 class Comm_AntRotationMtx(ExplicitComponent):
@@ -135,16 +135,18 @@ class Comm_AntRotationMtx(ExplicitComponent):
         self.n = n
 
     def setup(self):
+        n = self.n
+
         # Inputs
-        self.add_input('q_A', np.zeros((4, self.n)),
+        self.add_input('q_A', np.zeros((n, 4)),
                        desc='Quarternion matrix in antenna angle frame over time')
 
         # Outputs
-        self.add_output('O_AB', np.zeros((3, 3, self.n)), units=None,
+        self.add_output('O_AB', np.zeros((n, 3, 3)), units=None,
                         desc='Rotation matrix from antenna angle to body-fixed '
                              'frame over time')
 
-        self.J = np.empty((self.n, 3, 3, 4))
+        self.J = np.empty((n, 3, 3, 4))
 
     def compute(self, inputs, outputs):
         """
@@ -167,7 +169,7 @@ class Comm_AntRotationMtx(ExplicitComponent):
             B[2, :] = ( q_A[2, i], -q_A[1, i],  q_A[0, i])  # noqa: E201
             B[3, :] = ( q_A[1, i],  q_A[2, i],  q_A[3, i])  # noqa: E201
 
-            O_AB[:, :, i] = np.dot(A.T, B)
+            O_AB[i, :, :] = np.dot(A.T, B)
 
     def compute_partials(self, inputs, partials):
         """
@@ -223,15 +225,15 @@ class Comm_AntRotationMtx(ExplicitComponent):
         dB_dq[3, :, 3] = (0, 0, 1)
 
         for i in range(0, self.n):
-            A[0, :] = ( q_A[0, i], -q_A[3, i],  q_A[2, i])  # noqa: E201
-            A[1, :] = ( q_A[3, i],  q_A[0, i], -q_A[1, i])  # noqa: E201
-            A[2, :] = (-q_A[2, i],  q_A[1, i],  q_A[0, i])  # noqa: E201
-            A[3, :] = ( q_A[1, i],  q_A[2, i],  q_A[3, i])  # noqa: E201
+            A[0, :] = ( q_A[i, 0], -q_A[i, 3],  q_A[i, 2])  # noqa: E201
+            A[1, :] = ( q_A[i, 3],  q_A[i, 0], -q_A[i, 1])  # noqa: E201
+            A[2, :] = (-q_A[i, 2],  q_A[i, 1],  q_A[i, 0])  # noqa: E201
+            A[3, :] = ( q_A[i, 1],  q_A[i, 2],  q_A[i, 3])  # noqa: E201
 
-            B[0, :] = ( q_A[0, i],  q_A[3, i], -q_A[2, i])  # noqa: E201
-            B[1, :] = (-q_A[3, i],  q_A[0, i],  q_A[1, i])  # noqa: E201
-            B[2, :] = ( q_A[2, i], -q_A[1, i],  q_A[0, i])  # noqa: E201
-            B[3, :] = ( q_A[1, i],  q_A[2, i],  q_A[3, i])  # noqa: E201
+            B[0, :] = ( q_A[i, 0],  q_A[i, 3], -q_A[i, 2])  # noqa: E201
+            B[1, :] = (-q_A[i, 3],  q_A[i, 0],  q_A[i, 1])  # noqa: E201
+            B[2, :] = ( q_A[i, 2], -q_A[i, 1],  q_A[i, 0])  # noqa: E201
+            B[3, :] = ( q_A[i, 1],  q_A[i, 2],  q_A[i, 3])  # noqa: E201
 
             for k in range(0, 4):
                 self.J[i, :, :, k] = np.dot(dA_dq[:, :, k].T, B) + \
@@ -249,14 +251,14 @@ class Comm_AntRotationMtx(ExplicitComponent):
                 for u in range(3):
                     for v in range(3):
                         for k in range(4):
-                            dO_AB[u, v, :] += \
-                                self.J[:, u, v, k] * dq_A[k, :]
+                            dO_AB[:, u, v] += \
+                                self.J[:, u, v, k] * dq_A[:, k]
             else:
                 for u in range(3):
                     for v in range(3):
                         for k in range(4):
-                            dq_A[k, :] += self.J[:, u, v, k] * \
-                                dO_AB[u, v, :]
+                            dq_A[:, k] += self.J[:, u, v, k] * \
+                                dO_AB[:, u, v]
 
 
 class Comm_BitRate(ExplicitComponent):
@@ -383,13 +385,15 @@ class Comm_Distance(ExplicitComponent):
         self.n = n
 
     def setup(self):
+        n = self.n
+
         # Inputs
-        self.add_input('r_b2g_A', np.zeros((3, self.n)), units='km',
+        self.add_input('r_b2g_A', np.zeros((n, 3)), units='km',
                        desc='Position vector from satellite to ground station '
                             'in antenna angle frame over time')
 
         # Outputs
-        self.add_output('GSdist', np.zeros(self.n), units='km',
+        self.add_output('GSdist', np.zeros(n), units='km',
                         desc='Distance from ground station to satellite over time')
 
     def compute(self, inputs, outputs):
@@ -400,7 +404,7 @@ class Comm_Distance(ExplicitComponent):
         GSdist = outputs['GSdist']
 
         for i in range(0, self.n):
-            GSdist[i] = np.dot(r_b2g_A[:, i], r_b2g_A[:, i])**0.5
+            GSdist[i] = np.dot(r_b2g_A[i, :], r_b2g_A[i, :])**0.5
 
     def compute_partials(self, inputs, partials):
         """
@@ -410,9 +414,9 @@ class Comm_Distance(ExplicitComponent):
 
         self.J = np.zeros((self.n, 3))
         for i in range(0, self.n):
-            norm = np.dot(r_b2g_A[:, i], r_b2g_A[:, i])**0.5
+            norm = np.dot(r_b2g_A[i, :], r_b2g_A[i, :])**0.5
             if norm > 1e-10:
-                self.J[i, :] = r_b2g_A[:, i] / norm
+                self.J[i, :] = r_b2g_A[i, :] / norm
             else:
                 self.J[i, :] = 0.
 
@@ -423,11 +427,11 @@ class Comm_Distance(ExplicitComponent):
         if mode == 'fwd':
             if 'r_b2g_A' in d_inputs:
                 for k in range(3):
-                    d_outputs['GSdist'] += self.J[:, k] * d_inputs['r_b2g_A'][k, :]
+                    d_outputs['GSdist'] += self.J[:, k] * d_inputs['r_b2g_A'][:, k]
         else:
             if 'r_b2g_A' in d_inputs:
                 for k in range(3):
-                    d_inputs['r_b2g_A'][k, :] += self.J[:, k] * d_outputs['GSdist']
+                    d_inputs['r_b2g_A'][:, k] += self.J[:, k] * d_outputs['GSdist']
 
 
 class Comm_EarthsSpin(ExplicitComponent):
@@ -441,12 +445,14 @@ class Comm_EarthsSpin(ExplicitComponent):
         self.n = n
 
     def setup(self):
+        n = self.n
+
         # Inputs
-        self.add_input('t', np.zeros(self.n), units='s',
+        self.add_input('t', np.zeros(n), units='s',
                        desc='Time')
 
         # Outputs
-        self.add_output('q_E', np.zeros((4, self.n)), units=None,
+        self.add_output('q_E', np.zeros((n, 4)), units=None,
                         desc='Quarternion matrix in Earth-fixed frame over time')
 
     def compute(self, inputs, outputs):
@@ -459,8 +465,8 @@ class Comm_EarthsSpin(ExplicitComponent):
         fact = np.pi / 3600.0 / 24.0
         theta = fact * t
 
-        q_E[0, :] = np.cos(theta)
-        q_E[3, :] = -np.sin(theta)
+        q_E[:, 0] = np.cos(theta)
+        q_E[:, 3] = -np.sin(theta)
 
     def compute_partials(self, inputs, partials):
         """
@@ -484,11 +490,11 @@ class Comm_EarthsSpin(ExplicitComponent):
         if mode == 'fwd':
             if 't' in d_inputs:
                 for k in range(4):
-                    d_outputs['q_E'][k, :] += self.dq_dt[:, k] * d_inputs['t']
+                    d_outputs['q_E'][:, k] += self.dq_dt[:, k] * d_inputs['t']
         else:
             if 't' in d_inputs:
                 for k in range(4):
-                    d_inputs['t'] += self.dq_dt[:, k] * d_outputs['q_E'][k, :]
+                    d_inputs['t'] += self.dq_dt[:, k] * d_outputs['q_E'][:, k]
 
 
 class Comm_EarthsSpinMtx(ExplicitComponent):
