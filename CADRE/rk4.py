@@ -72,7 +72,9 @@ class RK4(ExplicitComponent):
             self.ext_index_map[name] = len(ext)
 
             # TODO: Check that shape[-1]==self.n
-            ext.extend(np.atleast_2d(var).T)
+            if len(var.shape) < 2:
+                var = var.reshape(self.n, 1)
+            ext.extend(var.T)
 
         for name in fixed_external_vars:
             var = inputs[name]
