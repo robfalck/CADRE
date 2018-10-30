@@ -295,11 +295,13 @@ class RK4(ExplicitComponent):
 
             i_ext = self.ext_index_map[name]
             ext_length = np.prod(dvar[0, :].shape)
-            for j in range(n_time-1):
-                Jsub = self.Jx[j+1, i_ext:i_ext+ext_length, :]
-                J_arg = Jsub.dot(dvar[j, :])
-                result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1))
-
+            try:
+                for j in range(n_time-1):
+                    Jsub = self.Jx[j+1, i_ext:i_ext+ext_length, :]
+                    J_arg = Jsub.T.dot(dvar[j, :].T).T
+                    result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1))
+            except:
+                pass
         # Time-invariant inputs
         for name in self.options['fixed_external_vars']:
 
