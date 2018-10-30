@@ -50,20 +50,20 @@ class Power_CellVoltage(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('LOS', np.zeros((n)), units=None,
+        self.add_input('LOS', np.zeros((n, )), units=None,
                        desc='Line of Sight over Time')
 
-        self.add_input('temperature', np.zeros((5, n)), units='degK',
+        self.add_input('temperature', np.zeros((n, 5)), units='degK',
                        desc='Temperature of solar cells over time')
 
-        self.add_input('exposedArea', np.zeros((7, 12, n)), units='m**2',
+        self.add_input('exposedArea', np.zeros((n, 7, 12)), units='m**2',
                        desc='Exposed area to sun for each solar cell over time')
 
-        self.add_input('Isetpt', np.zeros((12, n)), units='A',
+        self.add_input('Isetpt', np.zeros((n, 12)), units='A',
                        desc='Currents of the solar panels')
 
         # Outputs
-        self.add_output('V_sol', np.zeros((12, n)), units='V',
+        self.add_output('V_sol', np.zeros((n, 12)), units='V',
                         desc='Output voltage of solar panel over time')
 
     def setx(self, inputs):
@@ -75,9 +75,9 @@ class Power_CellVoltage(ExplicitComponent):
         for p in range(12):
             i = 4 if p < 4 else (p % 4)
             for c in range(7):
-                self.xV[:, c, p, 0] = temperature[i, :]
-                self.xV[:, c, p, 1] = LOS * exposedArea[c, p, :]
-                self.xV[:, c, p, 2] = Isetpt[p, :]
+                self.xV[:, c, p, 0] = temperature[:, i]
+                self.xV[:, c, p, 1] = LOS * exposedArea[:, c, p]
+                self.xV[:, c, p, 2] = Isetpt[:, p]
 
     def compute(self, inputs, outputs):
         """
@@ -86,9 +86,9 @@ class Power_CellVoltage(ExplicitComponent):
         self.setx(inputs)
         self.raw = self.MBI.evaluate(self.x)[:, 0].reshape((self.n, 7, 12),
                                                            order='F')
-        outputs['V_sol'] = np.zeros((12, self.n))
+        outputs['V_sol'] = np.zeros((self.n, 12))
         for c in range(7):
-            outputs['V_sol'] += self.raw[:, c, :].T
+            outputs['V_sol'] += self.raw[:, c, :]
 
     def compute_partials(self, inputs, partials):
         """
@@ -111,7 +111,7 @@ class Power_CellVoltage(ExplicitComponent):
         for p in range(12):
             i = 4 if p < 4 else (p % 4)
             for c in range(7):
-                self.dV_dL[:, p] += self.raw2[:, c, p] * exposedArea[c, p, :]
+                self.dV_dL[:, p] += self.raw2[:, c, p] * exposedArea[:, c, p]
                 self.dV_dT[:, p, i] += self.raw1[:, c, p]
                 self.dV_dA[:, c, p] += self.raw2[:, c, p] * LOS
                 self.dV_dI[:, p] += self.raw3[:, c, p]
@@ -124,37 +124,37 @@ class Power_CellVoltage(ExplicitComponent):
 
         if mode == 'fwd':
             if 'LOS' in d_inputs:
-                dV_sol += self.dV_dL.T * d_inputs['LOS']
+                dV_sol += self.dV_dL * d_inputs['LOS'].reshape((self.n, 1))
 
             if 'temperature' in d_inputs:
                 for p in range(12):
                     i = 4 if p < 4 else (p % 4)
-                    dV_sol[p, :] += self.dV_dT[:, p, i] * d_inputs['temperature'][i, :]
+                    dV_sol[:, p] += self.dV_dT[:, p, i] * d_inputs['temperature'][:, i]
 
             if 'Isetpt' in d_inputs:
-                dV_sol += self.dV_dI.T * d_inputs['Isetpt']
+                dV_sol += self.dV_dI * d_inputs['Isetpt']
 
             if 'exposedArea' in d_inputs:
                 for p in range(12):
-                    dV_sol[p, :] += \
-                        np.sum(self.dV_dA[:, :, p] * d_inputs['exposedArea'][:, p, :].T, 1)
+                    dV_sol[:, p] += \
+                        np.sum(self.dV_dA[:, :, p] * d_inputs['exposedArea'][:, :, p], 1)
         else:
             for p in range(12):
                 i = 4 if p < 4 else (p % 4)
 
                 if 'LOS' in d_inputs:
-                    d_inputs['LOS'] += self.dV_dL[:, p] * dV_sol[p, :]
+                    d_inputs['LOS'] += (self.dV_dL[:, p] * dV_sol[:, p]).T
 
                 if 'temperature' in d_inputs:
-                    d_inputs['temperature'][i, :] += self.dV_dT[:, p, i] * dV_sol[p, :]
+                    d_inputs['temperature'][:, i] += self.dV_dT[:, p, i] * dV_sol[:, p]
 
                 if 'Isetpt' in d_inputs:
-                    d_inputs['Isetpt'][p, :] += self.dV_dI[:, p] * dV_sol[p, :]
+                    d_inputs['Isetpt'][:, p] += self.dV_dI[:, p] * dV_sol[:, p]
 
                 if 'exposedArea' in d_inputs:
                     dexposedArea = d_inputs['exposedArea']
                     for c in range(7):
-                        dexposedArea[c, p, :] += self.dV_dA[:, c, p] * dV_sol[p, :]
+                        dexposedArea[:, c, p] += self.dV_dA[:, c, p] * dV_sol[:, p]
 
 
 class Power_SolarPower(ExplicitComponent):
@@ -171,10 +171,10 @@ class Power_SolarPower(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('Isetpt', np.zeros((12, n)), units='A',
+        self.add_input('Isetpt', np.zeros((n, 12)), units='A',
                        desc='Currents of the solar panels')
 
-        self.add_input('V_sol', np.zeros((12, n)), units='V',
+        self.add_input('V_sol', np.zeros((n, 12)), units='V',
                        desc='Output voltage of solar panel over time')
 
         self.add_output('P_sol', np.zeros((n, )), units='W',
@@ -190,7 +190,7 @@ class Power_SolarPower(ExplicitComponent):
 
         P_sol[:] = np.zeros((self.n, ))
         for p in range(12):
-            P_sol += V_sol[p, :] * Isetpt[p, :]
+            P_sol += V_sol[:, p] * Isetpt[:, p]
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
@@ -201,18 +201,18 @@ class Power_SolarPower(ExplicitComponent):
         if mode == 'fwd':
             if 'V_sol' in d_inputs:
                 for p in range(12):
-                    dP_sol += d_inputs['V_sol'][p, :] * inputs['Isetpt'][p, :]
+                    dP_sol += d_inputs['V_sol'][:, p] * inputs['Isetpt'][:, p]
 
             if 'Isetpt' in d_inputs:
                 for p in range(12):
-                    dP_sol += d_inputs['Isetpt'][p, :] * inputs['V_sol'][p, :]
+                    dP_sol += d_inputs['Isetpt'][:, p] * inputs['V_sol'][:, p]
         else:
             for p in range(12):
                 if 'V_sol' in d_inputs:
-                    d_inputs['V_sol'][p, :] += dP_sol * inputs['Isetpt'][p, :]
+                    d_inputs['V_sol'][:, p] += dP_sol * inputs['Isetpt'][:, p]
 
                 if 'Isetpt' in d_inputs:
-                    d_inputs['Isetpt'][p, :] += inputs['V_sol'][p, :] * dP_sol
+                    d_inputs['Isetpt'][:, p] += inputs['V_sol'][:, p] * dP_sol
 
 
 class Power_Total(ExplicitComponent):
@@ -238,7 +238,7 @@ class Power_Total(ExplicitComponent):
         self.add_input('P_comm', np.zeros((n, ), order='F'), units='W',
                        desc='Communication power over time')
 
-        self.add_input('P_RW', np.zeros((3, n, ), order='F'), units='W',
+        self.add_input('P_RW', np.zeros((n, 3, ), order='F'), units='W',
                        desc='Power used by reaction wheel over time')
 
         # Outputs
@@ -250,7 +250,7 @@ class Power_Total(ExplicitComponent):
         Calculate outputs.
         """
         outputs['P_bat'] = inputs['P_sol'] - 5.0*inputs['P_comm'] - \
-            np.sum(inputs['P_RW'], 0) - 2.0
+            np.sum(inputs['P_RW'], 1) - 2.0
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
@@ -267,7 +267,7 @@ class Power_Total(ExplicitComponent):
 
             if 'P_RW' in d_inputs:
                 for k in range(3):
-                    dP_bat -= d_inputs['P_RW'][k, :]
+                    dP_bat -= d_inputs['P_RW'][:, k]
 
         else:
             if 'P_sol' in d_inputs:
@@ -278,4 +278,4 @@ class Power_Total(ExplicitComponent):
 
             if 'P_RW' in d_inputs:
                 for k in range(3):
-                    d_inputs['P_RW'][k, :] -= dP_bat
+                    d_inputs['P_RW'][:, k] -= dP_bat

@@ -26,17 +26,17 @@ class ReactionWheel_Motor(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('T_RW', np.zeros((3, n)), units='N*m',
+        self.add_input('T_RW', np.zeros((n, 3)), units='N*m',
                        desc='Torque vector of reaction wheel over time')
 
-        self.add_input('w_B', np.zeros((3, n)), units='1/s',
+        self.add_input('w_B', np.zeros((n, 3)), units='1/s',
                        desc='Angular velocity vector in body-fixed frame over time')
 
-        self.add_input('w_RW', np.zeros((3, n)), units='1/s',
+        self.add_input('w_RW', np.zeros((n, 3)), units='1/s',
                        desc='Angular velocity vector of reaction wheel over time')
 
         # Outputs
-        self.add_output('T_m', np.ones((3, n)), units='N*m',
+        self.add_output('T_m', np.ones((n, 3)), units='N*m',
                         desc='Torque vector of motor over time')
 
     def compute(self, inputs, outputs):
@@ -51,11 +51,11 @@ class ReactionWheel_Motor(ExplicitComponent):
         w_Bx = np.zeros((3, 3))
         h_RW = self.J_RW * w_RW[:]
         for i in range(0, self.n):
-            w_Bx[0, :] = (0., -w_B[2, i], w_B[1, i])
-            w_Bx[1, :] = (w_B[2, i], 0., -w_B[0, i])
-            w_Bx[2, :] = (-w_B[1, i], w_B[0, i], 0.)
+            w_Bx[0, :] = (0., -w_B[i, 2], w_B[i, 1])
+            w_Bx[1, :] = (w_B[i, 2], 0., -w_B[i, 0])
+            w_Bx[2, :] = (-w_B[i, 1], w_B[i, 0], 0.)
 
-            T_m[:, i] = -T_RW[:, i] - np.dot(w_Bx, h_RW[:, i])
+            T_m[i, :] = -T_RW[i, :] - np.dot(w_Bx, h_RW[i, :])
 
     def compute_partials(self, inputs, partials):
         """
@@ -73,9 +73,9 @@ class ReactionWheel_Motor(ExplicitComponent):
         dwx_dwb = np.zeros((3, 3, 3))
         h_RW = self.J_RW * w_RW[:]
         for i in range(0, self.n):
-            w_Bx[0, :] = (0., -w_B[2, i], w_B[1, i])
-            w_Bx[1, :] = (w_B[2, i], 0., -w_B[0, i])
-            w_Bx[2, :] = (-w_B[1, i], w_B[0, i], 0.)
+            w_Bx[0, :] = (0., -w_B[i, 2], w_B[i, 1])
+            w_Bx[1, :] = (w_B[i, 2], 0., -w_B[i, 0])
+            w_Bx[2, :] = (-w_B[i, 1], w_B[i, 0], 0.)
 
             dwx_dwb[0, :, 0] = (0., 0., 0.)
             dwx_dwb[1, :, 0] = (0., 0., -1.)
@@ -91,7 +91,7 @@ class ReactionWheel_Motor(ExplicitComponent):
 
             for k in range(0, 3):
                 self.dT_dTm[i, k, k] = -1.
-                self.dT_dwb[i, :, k] = -np.dot(dwx_dwb[:, :, k], h_RW[:, i])
+                self.dT_dwb[i, :, k] = -np.dot(dwx_dwb[:, :, k], h_RW[i, :])
             self.dT_dh[i, :, :] = -w_Bx
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
@@ -104,22 +104,22 @@ class ReactionWheel_Motor(ExplicitComponent):
             for k in range(3):
                 for j in range(3):
                     if 'T_RW' in d_inputs:
-                        dT_m[k, :] += self.dT_dTm[:, k, j] * d_inputs['T_RW'][j, :]
+                        dT_m[:, k] += self.dT_dTm[:, k, j] * d_inputs['T_RW'][:, j]
                     if 'w_B' in d_inputs:
-                        dT_m[k, :] += self.dT_dwb[:, k, j] * d_inputs['w_B'][j, :]
+                        dT_m[:, k] += self.dT_dwb[:, k, j] * d_inputs['w_B'][:, j]
                     if 'w_RW' in d_inputs:
-                        dT_m[k, :] += self.dT_dh[:, k, j] * d_inputs['w_RW'][j, :] * self.J_RW
+                        dT_m[:, k] += self.dT_dh[:, k, j] * d_inputs['w_RW'][:, j] * self.J_RW
         else:
             for k in range(3):
                 for j in range(3):
                     if 'T_RW' in d_inputs:
-                        d_inputs['T_RW'][j, :] += self.dT_dTm[:, k, j] * dT_m[k, :]
+                        d_inputs['T_RW'][:, j] += self.dT_dTm[:, k, j] * dT_m[:, k]
 
                     if 'w_B' in d_inputs:
-                        d_inputs['w_B'][j, :] += self.dT_dwb[:, k, j] * dT_m[k, :]
+                        d_inputs['w_B'][:, j] += self.dT_dwb[:, k, j] * dT_m[:, k]
 
                     if 'w_RW' in d_inputs:
-                        d_inputs['w_RW'][j, :] += self.dT_dh[:, k, j] * dT_m[k, :] * self.J_RW
+                        d_inputs['w_RW'][:, j] += self.dT_dh[:, k, j] * dT_m[:, k] * self.J_RW
 
 
 class ReactionWheel_Power(ExplicitComponent):
@@ -141,14 +141,14 @@ class ReactionWheel_Power(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('w_RW', np.zeros((3, n)), units='1/s',
+        self.add_input('w_RW', np.zeros((n, 3)), units='1/s',
                        desc='Angular velocity vector of reaction wheel over time')
 
-        self.add_input('T_RW', np.zeros((3, n)), units='N*m',
+        self.add_input('T_RW', np.zeros((n, 3)), units='N*m',
                        desc='Torque vector of reaction wheel over time')
 
         # Outputs
-        self.add_output('P_RW', np.ones((3, n)), units='W',
+        self.add_output('P_RW', np.ones((n, 3)), units='W',
                         desc='Reaction wheel power over time')
 
     def compute(self, inputs, outputs):
@@ -161,22 +161,23 @@ class ReactionWheel_Power(ExplicitComponent):
 
         for i in range(self.n):
             for k in range(3):
-                P_RW[k, i] = (self.V * (self.a * w_RW[k, i] +
-                              self.b * T_RW[k, i])**2 +
+                P_RW[i, k] = (self.V * (self.a * w_RW[i, k] +
+                              self.b * T_RW[i, k])**2 +
                               self.V * self.I0)
 
     def compute_partials(self, inputs, partials):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
+        n = self.n
         w_RW = inputs['w_RW']
         T_RW = inputs['T_RW']
 
-        self.dP_dw = np.zeros((self.n, 3))
-        self.dP_dT = np.zeros((self.n, 3))
-        for i in range(self.n):
+        self.dP_dw = np.zeros((n, 3))
+        self.dP_dT = np.zeros((n, 3))
+        for i in range(n):
             for k in range(3):
-                prod = 2 * self.V * (self.a * w_RW[k, i] + self.b * T_RW[k, i])
+                prod = 2 * self.V * (self.a * w_RW[i, k] + self.b * T_RW[i, k])
                 self.dP_dw[i, k] = self.a * prod
                 self.dP_dT[i, k] = self.b * prod
 
@@ -189,15 +190,15 @@ class ReactionWheel_Power(ExplicitComponent):
         if mode == 'fwd':
             for k in range(3):
                 if 'w_RW' in d_inputs:
-                    dP_RW[k, :] += self.dP_dw[:, k] * d_inputs['w_RW'][k, :]
+                    dP_RW[:, k] += self.dP_dw[:, k] * d_inputs['w_RW'][:, k]
                 if 'T_RW' in d_inputs:
-                    dP_RW[k, :] += self.dP_dT[:, k] * d_inputs['T_RW'][k, :]
+                    dP_RW[:, k] += self.dP_dT[:, k] * d_inputs['T_RW'][:, k]
         else:
             for k in range(3):
                 if 'w_RW' in d_inputs:
-                    d_inputs['w_RW'][k, :] += self.dP_dw[:, k] * dP_RW[k, :]
+                    d_inputs['w_RW'][:, k] += self.dP_dw[:, k] * dP_RW[:, k]
                 if 'T_RW' in d_inputs:
-                    d_inputs['T_RW'][k, :] += self.dP_dT[:, k] * dP_RW[k, :]
+                    d_inputs['T_RW'][:, k] += self.dP_dT[:, k] * dP_RW[:, k]
 
 
 class ReactionWheel_Torque(ExplicitComponent):
@@ -214,11 +215,11 @@ class ReactionWheel_Torque(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('T_tot', np.zeros((3, n)), units='N*m',
+        self.add_input('T_tot', np.zeros((n, 3)), units='N*m',
                        desc='Total reaction wheel torque over time')
 
         # Outputs
-        self.add_output('T_RW', np.zeros((3, n)), units='N*m',
+        self.add_output('T_RW', np.zeros((n, 3)), units='N*m',
                         desc='Torque vector of reaction wheel over time')
 
     def compute(self, inputs, outputs):
@@ -253,17 +254,17 @@ class ReactionWheel_Dynamics(rk4.RK4):
         n_times = self.n_times
 
         # Inputs
-        self.add_input('w_B', np.zeros((3, n_times)), units='1/s',
+        self.add_input('w_B', np.zeros((n_times, 3)), units='1/s',
                        desc='Angular velocity vector in body-fixed frame over time')
 
-        self.add_input('T_RW', np.zeros((3, n_times)), units='N*m',
+        self.add_input('T_RW', np.zeros((n_times, 3)), units='N*m',
                        desc='Torque vector of reaction wheel over time')
 
-        self.add_input('w_RW0', np.zeros((3,)), units='1/s',
+        self.add_input('w_RW0', np.zeros((3, )), units='1/s',
                        desc='Initial angular velocity vector of reaction wheel')
 
         # Outputs
-        self.add_output('w_RW', np.zeros((3, n_times)), units='1/s',
+        self.add_output('w_RW', np.zeros((n_times, 3)), units='1/s',
                         desc='Angular velocity vector of reaction wheel over time')
 
         self.options['state_var'] = 'w_RW'

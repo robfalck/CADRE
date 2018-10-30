@@ -41,7 +41,7 @@ class Comm_DataDownloaded(rk4.RK4):
                        desc='Initial downloaded data state')
 
         # States
-        self.add_output('Data', np.zeros((n_times, )), units='Gibyte',
+        self.add_output('Data', np.zeros((n_times, 1)), units='Gibyte',
                         desc='Downloaded data state over time')
 
         self.options['state_var'] = 'Data'
@@ -159,15 +159,15 @@ class Comm_AntRotationMtx(ExplicitComponent):
         B = np.zeros((4, 3))
 
         for i in range(0, self.n):
-            A[0, :] = ( q_A[0, i], -q_A[3, i],  q_A[2, i])  # noqa: E201
-            A[1, :] = ( q_A[3, i],  q_A[0, i], -q_A[1, i])  # noqa: E201
-            A[2, :] = (-q_A[2, i],  q_A[1, i],  q_A[0, i])  # noqa: E201
-            A[3, :] = ( q_A[1, i],  q_A[2, i],  q_A[3, i])  # noqa: E201
+            A[0, :] = ( q_A[i, 0], -q_A[i, 3],  q_A[i, 2])  # noqa: E201
+            A[1, :] = ( q_A[i, 3],  q_A[i, 0], -q_A[i, 1])  # noqa: E201
+            A[2, :] = (-q_A[i, 2],  q_A[i, 1],  q_A[i, 0])  # noqa: E201
+            A[3, :] = ( q_A[i, 1],  q_A[i, 2],  q_A[i, 3])  # noqa: E201
 
-            B[0, :] = ( q_A[0, i],  q_A[3, i], -q_A[2, i])  # noqa: E201
-            B[1, :] = (-q_A[3, i],  q_A[0, i],  q_A[1, i])  # noqa: E201
-            B[2, :] = ( q_A[2, i], -q_A[1, i],  q_A[0, i])  # noqa: E201
-            B[3, :] = ( q_A[1, i],  q_A[2, i],  q_A[3, i])  # noqa: E201
+            B[0, :] = ( q_A[i, 0],  q_A[i, 3], -q_A[i, 2])  # noqa: E201
+            B[1, :] = (-q_A[i, 3],  q_A[i, 0],  q_A[i, 1])  # noqa: E201
+            B[2, :] = ( q_A[i, 2], -q_A[i, 1],  q_A[i, 0])  # noqa: E201
+            B[3, :] = ( q_A[i, 1],  q_A[i, 2],  q_A[i, 3])  # noqa: E201
 
             O_AB[i, :, :] = np.dot(A.T, B)
 
@@ -282,21 +282,23 @@ class Comm_BitRate(ExplicitComponent):
         self.n = n
 
     def setup(self):
+        n = self.n
+
         # Inputs
-        self.add_input('P_comm', np.zeros(self.n), units='W',
+        self.add_input('P_comm', np.zeros(n), units='W',
                        desc='Communication power over time')
 
-        self.add_input('gain', np.zeros(self.n), units=None,
+        self.add_input('gain', np.zeros(n), units=None,
                        desc='Transmitter gain over time')
 
-        self.add_input('GSdist', np.zeros(self.n), units='km',
+        self.add_input('GSdist', np.zeros(n), units='km',
                        desc='Distance from ground station to satellite over time')
 
-        self.add_input('CommLOS', np.zeros(self.n), units=None,
+        self.add_input('CommLOS', np.zeros(n), units=None,
                        desc='Satellite to ground station line of sight over time')
 
         # Outputs
-        self.add_output('Dr', np.zeros(self.n), units='Gibyte/s',
+        self.add_output('Dr', np.zeros(n), units='Gibyte/s',
                         desc='Download rate over time')
 
     def compute(self, inputs, outputs):
@@ -508,12 +510,14 @@ class Comm_EarthsSpinMtx(ExplicitComponent):
         self.n = n
 
     def setup(self):
+        n = self.n
+
         # Inputs
-        self.add_input('q_E', np.zeros((4, self.n)), units=None,
+        self.add_input('q_E', np.zeros((n, 4)), units=None,
                        desc='Quarternion matrix in Earth-fixed frame over time')
 
         # Outputs
-        self.add_output('O_IE', np.zeros((3, 3, self.n)), units=None,
+        self.add_output('O_IE', np.zeros((n, 3, 3)), units=None,
                         desc='Rotation matrix from Earth-centered inertial frame to '
                              'Earth-fixed frame over time')
 
@@ -528,17 +532,17 @@ class Comm_EarthsSpinMtx(ExplicitComponent):
         B = np.zeros((4, 3))
 
         for i in range(0, self.n):
-            A[0, :] = ( q_E[0, i], -q_E[3, i],  q_E[2, i])  # noqa: E201
-            A[1, :] = ( q_E[3, i],  q_E[0, i], -q_E[1, i])  # noqa: E201
-            A[2, :] = (-q_E[2, i],  q_E[1, i],  q_E[0, i])  # noqa: E201
-            A[3, :] = ( q_E[1, i],  q_E[2, i],  q_E[3, i])  # noqa: E201
+            A[0, :] = ( q_E[i, 0], -q_E[i, 3],  q_E[i, 2])  # noqa: E201
+            A[1, :] = ( q_E[i, 3],  q_E[i, 0], -q_E[i, 1])  # noqa: E201
+            A[2, :] = (-q_E[i, 2],  q_E[i, 1],  q_E[i, 0])  # noqa: E201
+            A[3, :] = ( q_E[i, 1],  q_E[i, 2],  q_E[i, 3])  # noqa: E201
 
-            B[0, :] = ( q_E[0, i],  q_E[3, i], -q_E[2, i])  # noqa: E201
-            B[1, :] = (-q_E[3, i],  q_E[0, i],  q_E[1, i])  # noqa: E201
-            B[2, :] = ( q_E[2, i], -q_E[1, i],  q_E[0, i])  # noqa: E201
-            B[3, :] = ( q_E[1, i],  q_E[2, i],  q_E[3, i])  # noqa: E201
+            B[0, :] = ( q_E[i, 0],  q_E[i, 3], -q_E[i, 2])  # noqa: E201
+            B[1, :] = (-q_E[i, 3],  q_E[i, 0],  q_E[i, 1])  # noqa: E201
+            B[2, :] = ( q_E[i, 2], -q_E[i, 1],  q_E[i, 0])  # noqa: E201
+            B[3, :] = ( q_E[i, 1],  q_E[i, 2],  q_E[i, 3])  # noqa: E201
 
-            O_IE[:, :, i] = np.dot(A.T, B)
+            O_IE[i, :, :] = np.dot(A.T, B)
 
     def compute_partials(self, inputs, partials):
         """
@@ -597,15 +601,15 @@ class Comm_EarthsSpinMtx(ExplicitComponent):
         dB_dq[3, :, 3] = (0, 0, 1)
 
         for i in range(0, self.n):
-            A[0, :] = ( q_E[0, i], -q_E[3, i],  q_E[2, i])  # noqa: E201
-            A[1, :] = ( q_E[3, i],  q_E[0, i], -q_E[1, i])  # noqa: E201
-            A[2, :] = (-q_E[2, i],  q_E[1, i],  q_E[0, i])  # noqa: E201
-            A[3, :] = ( q_E[1, i],  q_E[2, i],  q_E[3, i])  # noqa: E201
+            A[0, :] = ( q_E[i, 0], -q_E[i, 3],  q_E[i, 2])  # noqa: E201
+            A[1, :] = ( q_E[i, 3],  q_E[i, 0], -q_E[i, 1])  # noqa: E201
+            A[2, :] = (-q_E[i, 2],  q_E[i, 1],  q_E[i, 0])  # noqa: E201
+            A[3, :] = ( q_E[i, 1],  q_E[i, 2],  q_E[i, 3])  # noqa: E201
 
-            B[0, :] = ( q_E[0, i],  q_E[3, i], -q_E[2, i])  # noqa: E201
-            B[1, :] = (-q_E[3, i],  q_E[0, i],  q_E[1, i])  # noqa: E201
-            B[2, :] = ( q_E[2, i], -q_E[1, i],  q_E[0, i])  # noqa: E201
-            B[3, :] = ( q_E[1, i],  q_E[2, i],  q_E[3, i])  # noqa: E201
+            B[0, :] = ( q_E[i, 0],  q_E[i, 3], -q_E[i, 2])  # noqa: E201
+            B[1, :] = (-q_E[i, 3],  q_E[i, 0],  q_E[i, 1])  # noqa: E201
+            B[2, :] = ( q_E[i, 2], -q_E[i, 1],  q_E[i, 0])  # noqa: E201
+            B[3, :] = ( q_E[i, 1],  q_E[i, 2],  q_E[i, 3])  # noqa: E201
 
             for k in range(0, 4):
                 self.J[i, :, :, k] = np.dot(dA_dq[:, :, k].T, B) + \
@@ -623,14 +627,14 @@ class Comm_EarthsSpinMtx(ExplicitComponent):
                 for u in range(3):
                     for v in range(3):
                         for k in range(4):
-                            dO_IE[u, v, :] += self.J[:, u, v, k] * \
-                                dq_E[k, :]
+                            dO_IE[:, u, v] += self.J[:, u, v, k] * \
+                                dq_E[:, k]
             else:
                 for u in range(3):
                     for v in range(3):
                         for k in range(4):
-                            dq_E[k, :] += self.J[:, u, v, k] * \
-                                dO_IE[u, v, :]
+                            dq_E[:, k] += self.J[:, u, v, k] * \
+                                dO_IE[:, u, v]
 
 
 class Comm_GainPattern(ExplicitComponent):
@@ -731,7 +735,7 @@ class Comm_GSposEarth(ExplicitComponent):
                        desc='Altitude of ground station in Earth-fixed frame')
 
         # Outputs
-        self.add_output('r_e2g_E', np.zeros((3, self.n)), units='km',
+        self.add_output('r_e2g_E', np.zeros((self.n, 3)), units='km',
                         desc='Position vector from earth to ground station in '
                              'Earth-fixed frame over time')
 
@@ -747,9 +751,9 @@ class Comm_GSposEarth(ExplicitComponent):
         cos_lat = np.cos(self.d2r * lat)
         r_GS = (self.Re + alt)
 
-        r_e2g_E[0, :] = r_GS * cos_lat * np.cos(self.d2r*lon)
-        r_e2g_E[1, :] = r_GS * cos_lat * np.sin(self.d2r*lon)
-        r_e2g_E[2, :] = r_GS * np.sin(self.d2r*lat)
+        r_e2g_E[:, 0] = r_GS * cos_lat * np.cos(self.d2r*lon)
+        r_e2g_E[:, 1] = r_GS * cos_lat * np.sin(self.d2r*lon)
+        r_e2g_E[:, 2] = r_GS * np.sin(self.d2r*lat)
 
     def compute_partials(self, inputs, partials):
         """
@@ -791,21 +795,21 @@ class Comm_GSposEarth(ExplicitComponent):
         if mode == 'fwd':
             if 'lon' in d_inputs:
                 for k in range(3):
-                    dr_e2g_E[k, :] += self.dr_dlon[k] * d_inputs['lon']
+                    dr_e2g_E[:, k] += self.dr_dlon[k] * d_inputs['lon']
             if 'lat' in d_inputs:
                 for k in range(3):
-                    dr_e2g_E[k, :] += self.dr_dlat[k] * d_inputs['lat']
+                    dr_e2g_E[:, k] += self.dr_dlat[k] * d_inputs['lat']
             if 'alt' in d_inputs:
                 for k in range(3):
-                    dr_e2g_E[k, :] += self.dr_dalt[k] * d_inputs['alt']
+                    dr_e2g_E[:, k] += self.dr_dalt[k] * d_inputs['alt']
         else:
             for k in range(3):
                 if 'lon' in d_inputs:
-                    d_inputs['lon'] += self.dr_dlon[k] * np.sum(dr_e2g_E[k, :])
+                    d_inputs['lon'] += self.dr_dlon[k] * np.sum(dr_e2g_E[:, k])
                 if 'lat' in d_inputs:
-                    d_inputs['lat'] += self.dr_dlat[k] * np.sum(dr_e2g_E[k, :])
+                    d_inputs['lat'] += self.dr_dlat[k] * np.sum(dr_e2g_E[:, k])
                 if 'alt' in d_inputs:
-                    d_inputs['alt'] += self.dr_dalt[k] * np.sum(dr_e2g_E[k, :])
+                    d_inputs['alt'] += self.dr_dalt[k] * np.sum(dr_e2g_E[:, k])
 
 
 class Comm_GSposECI(ExplicitComponent):
@@ -819,17 +823,19 @@ class Comm_GSposECI(ExplicitComponent):
         self.n = n
 
     def setup(self):
+        n = self.n
+
         # Inputs
-        self.add_input('O_IE', np.zeros((3, 3, self.n)), units=None,
+        self.add_input('O_IE', np.zeros((n, 3, 3)), units=None,
                        desc='Rotation matrix from Earth-centered inertial '
                             'frame to Earth-fixed frame over time')
 
-        self.add_input('r_e2g_E', np.zeros((3, self.n)), units='km',
+        self.add_input('r_e2g_E', np.zeros((n, 3)), units='km',
                        desc='Position vector from earth to ground station in '
                             'Earth-fixed frame over time')
 
         # Outputs
-        self.add_output('r_e2g_I', np.zeros((3, self.n)), units='km',
+        self.add_output('r_e2g_I', np.zeros((n, 3)), units='km',
                         desc='Position vector from earth to ground station in '
                              'Earth-centered inertial frame over time')
 
@@ -842,7 +848,7 @@ class Comm_GSposECI(ExplicitComponent):
         r_e2g_I = outputs['r_e2g_I']
 
         for i in range(0, self.n):
-            r_e2g_I[:, i] = np.dot(O_IE[:, :, i], r_e2g_E[:, i])
+            r_e2g_I[i, :] = np.dot(O_IE[i, :, :], r_e2g_E[i, :])
 
     def compute_partials(self, inputs, partials):
         """
@@ -855,9 +861,9 @@ class Comm_GSposECI(ExplicitComponent):
 
         for k in range(0, 3):
             for v in range(0, 3):
-                self.J1[:, k, k, v] = r_e2g_E[v, :]
+                self.J1[:, k, k, v] = r_e2g_E[:, v]
 
-        self.J2 = np.transpose(O_IE, (2, 0, 1))
+        self.J2 = O_IE[:]
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
@@ -870,23 +876,23 @@ class Comm_GSposECI(ExplicitComponent):
                 for u in range(3):
                     if 'O_IE' in d_inputs:
                         for v in range(3):
-                            dr_e2g_I[k, :] += self.J1[:, k, u, v] * \
-                                d_inputs['O_IE'][u, v, :]
+                            dr_e2g_I[:, k] += self.J1[:, k, u, v] * \
+                                d_inputs['O_IE'][:, u, v]
 
                     if 'r_e2g_E' in d_inputs:
-                        dr_e2g_I[k, :] += self.J2[:, k, u] * \
-                            d_inputs['r_e2g_E'][u, :]
+                        dr_e2g_I[:, k] += self.J2[:, k, u] * \
+                            d_inputs['r_e2g_E'][:, u]
         else:
             for k in range(3):
                 if 'O_IE' in d_inputs:
                     for u in range(3):
                         for v in range(3):
-                            d_inputs['O_IE'][u, v, :] += self.J1[:, k, u, v] * \
-                                dr_e2g_I[k, :]
+                            d_inputs['O_IE'][:, u, v] += self.J1[:, k, u, v] * \
+                                dr_e2g_I[:, k]
                 if 'r_e2g_E' in d_inputs:
                     for j in range(3):
-                        d_inputs['r_e2g_E'][j, :] += self.J2[:, k, j] * \
-                            dr_e2g_I[k, :]
+                        d_inputs['r_e2g_E'][:, j] += self.J2[:, k, j] * \
+                            dr_e2g_I[:, k]
 
 
 class Comm_LOS(ExplicitComponent):
@@ -906,11 +912,11 @@ class Comm_LOS(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('r_b2g_I', np.zeros((3, n)), units='km',
+        self.add_input('r_b2g_I', np.zeros((n, 3)), units='km',
                        desc='Position vector from satellite to ground station '
                             'in Earth-centered inertial frame over time')
 
-        self.add_input('r_e2g_I', np.zeros((3, n)), units='km',
+        self.add_input('r_e2g_I', np.zeros((n, 3)), units='km',
                        desc='Position vector from earth to ground station in '
                             'Earth-centered inertial frame over time')
 
@@ -922,13 +928,14 @@ class Comm_LOS(ExplicitComponent):
         """
         Calculate outputs.
         """
+        n = self.n
         r_b2g_I = inputs['r_b2g_I']
         r_e2g_I = inputs['r_e2g_I']
         CommLOS = outputs['CommLOS']
 
         Rb = 100.0
-        for i in range(0, self.n):
-            proj = np.dot(r_b2g_I[:, i], r_e2g_I[:, i]) / self.Re
+        for i in range(n, 0):
+            proj = np.dot(r_b2g_I[i, :], r_e2g_I[i, :]) / self.Re
 
             if proj > 0:
                 CommLOS[i] = 0.
@@ -942,6 +949,7 @@ class Comm_LOS(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
+        n = self.n
         r_b2g_I = inputs['r_b2g_I']
         r_e2g_I = inputs['r_e2g_I']
 
@@ -949,9 +957,9 @@ class Comm_LOS(ExplicitComponent):
         self.dLOS_dre = np.zeros((self.n, 3))
 
         Rb = 10.0
-        for i in range(0, self.n):
+        for i in range(0, n):
 
-            proj = np.dot(r_b2g_I[:, i], r_e2g_I[:, i]) / self.Re
+            proj = np.dot(r_b2g_I[i, :], r_e2g_I[i, :]) / self.Re
 
             if proj > 0:
                 self.dLOS_drb[i, :] = 0.
@@ -963,8 +971,8 @@ class Comm_LOS(ExplicitComponent):
                 x = (proj - 0) / (-Rb - 0)
                 dx_dproj = -1. / Rb
                 dLOS_dx = 6 * x - 6 * x ** 2
-                dproj_drb = r_e2g_I[:, i]
-                dproj_dre = r_b2g_I[:, i]
+                dproj_drb = r_e2g_I[i, :]
+                dproj_dre = r_b2g_I[i, :]
 
                 self.dLOS_drb[i, :] = dLOS_dx * dx_dproj * dproj_drb
                 self.dLOS_dre[i, :] = dLOS_dx * dx_dproj * dproj_dre
@@ -978,15 +986,15 @@ class Comm_LOS(ExplicitComponent):
         if mode == 'fwd':
             for k in range(3):
                 if 'r_b2g_I' in d_inputs:
-                    dCommLOS += self.dLOS_drb[:, k] * d_inputs['r_b2g_I'][k, :]
+                    dCommLOS += self.dLOS_drb[:, k] * d_inputs['r_b2g_I'][:, k]
                 if 'r_e2g_I' in d_inputs:
-                    dCommLOS += self.dLOS_dre[:, k] * d_inputs['r_e2g_I'][k, :]
+                    dCommLOS += self.dLOS_dre[:, k] * d_inputs['r_e2g_I'][:, k]
         else:
             for k in range(3):
                 if 'r_b2g_I' in d_inputs:
-                    d_inputs['r_b2g_I'][k, :] += self.dLOS_drb[:, k] * dCommLOS
+                    d_inputs['r_b2g_I'][:, k] += self.dLOS_drb[:, k] * dCommLOS
                 if 'r_e2g_I' in d_inputs:
-                    d_inputs['r_e2g_I'][k, :] += self.dLOS_dre[:, k] * dCommLOS
+                    d_inputs['r_e2g_I'][:, k] += self.dLOS_dre[:, k] * dCommLOS
 
 
 class Comm_VectorAnt(ExplicitComponent):
@@ -1002,16 +1010,16 @@ class Comm_VectorAnt(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('r_b2g_B', np.zeros((3, n)), units='km',
+        self.add_input('r_b2g_B', np.zeros((n, 3)), units='km',
                        desc='Position vector from satellite to ground station '
                             'in body-fixed frame over time')
 
-        self.add_input('O_AB', np.zeros((3, 3, n)), units=None,
+        self.add_input('O_AB', np.zeros((n, 3, 3)), units=None,
                        desc='Rotation matrix from antenna angle to body-fixed '
                             'frame over time')
 
         # Outputs
-        self.add_output('r_b2g_A', np.zeros((3, n)), units='km',
+        self.add_output('r_b2g_A', np.zeros((n, 3)), units='km',
                         desc='Position vector from satellite to ground station '
                              'in antenna angle frame over time')
 
@@ -1040,23 +1048,23 @@ class Comm_VectorAnt(ExplicitComponent):
                 if 'O_AB' in d_inputs:
                     for u in range(3):
                         for v in range(3):
-                            dr_b2g_A[k, :] += self.J1[:, k, u, v] * \
-                                d_inputs['O_AB'][u, v, :]
+                            dr_b2g_A[:, k] += self.J1[:, k, u, v] * \
+                                d_inputs['O_AB'][:, u, v]
                 if 'r_b2g_B' in d_inputs:
                     for j in range(3):
-                        dr_b2g_A[k, :] += self.J2[:, k, j] * \
-                            d_inputs['r_b2g_B'][j, :]
+                        dr_b2g_A[:, k] += self.J2[:, k, j] * \
+                            d_inputs['r_b2g_B'][:, j]
         else:
             for k in range(3):
                 if 'O_AB' in d_inputs:
                     for u in range(3):
                         for v in range(3):
-                            d_inputs['O_AB'][u, v, :] += self.J1[:, k, u, v] * \
-                                dr_b2g_A[k, :]
+                            d_inputs['O_AB'][:, u, v] += self.J1[:, k, u, v] * \
+                                dr_b2g_A[:, k]
                 if 'r_b2g_B' in d_inputs:
                     for j in range(3):
-                        d_inputs['r_b2g_B'][j, :] += self.J2[:, k, j] * \
-                            dr_b2g_A[k, :]
+                        d_inputs['r_b2g_B'][:, j] += self.J2[:, k, j] * \
+                            dr_b2g_A[:, k]
 
 
 class Comm_VectorBody(ExplicitComponent):
@@ -1072,16 +1080,16 @@ class Comm_VectorBody(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('r_b2g_I', np.zeros((3, n)), units='km',
+        self.add_input('r_b2g_I', np.zeros((n, 3)), units='km',
                        desc='Position vector from satellite to ground station '
                             'in Earth-centered inertial frame over time')
 
-        self.add_input('O_BI', np.zeros((3, 3, n)), units=None,
+        self.add_input('O_BI', np.zeros((n, 3, 3)), units=None,
                        desc='Rotation matrix from body-fixed frame to Earth-centered'
                             'inertial frame over time')
 
         # Outputs
-        self.add_output('r_b2g_B', np.zeros((3, n)), units='km',
+        self.add_output('r_b2g_B', np.zeros((n, 3,)), units='km',
                         desc='Position vector from satellite to ground station '
                              'in body-fixed frame over time')
 
@@ -1094,7 +1102,7 @@ class Comm_VectorBody(ExplicitComponent):
         r_b2g_B = outputs['r_b2g_B']
 
         for i in range(0, self.n):
-            r_b2g_B[:, i] = np.dot(O_BI[:, :, i], r_b2g_I[:, i])
+            r_b2g_B[i, :] = np.dot(O_BI[i, :, :], r_b2g_I[i, :])
 
     def compute_partials(self, inputs, partials):
         """
@@ -1107,9 +1115,9 @@ class Comm_VectorBody(ExplicitComponent):
 
         for k in range(0, 3):
             for v in range(0, 3):
-                self.J1[:, k, k, v] = r_b2g_I[v, :]
+                self.J1[:, k, k, v] = r_b2g_I[:, v]
 
-        self.J2 = np.transpose(O_BI, (2, 0, 1))
+        self.J2 = O_BI[:]
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
@@ -1122,23 +1130,23 @@ class Comm_VectorBody(ExplicitComponent):
                 if 'O_BI' in d_inputs:
                     for u in range(3):
                         for v in range(3):
-                            dr_b2g_B[k, :] += self.J1[:, k, u, v] * \
-                                d_inputs['O_BI'][u, v, :]
+                            dr_b2g_B[:, k] += self.J1[:, k, u, v] * \
+                                d_inputs['O_BI'][:, u, v]
                 if 'r_b2g_I' in d_inputs:
                     for j in range(3):
-                        dr_b2g_B[k, :] += self.J2[:, k, j] * \
-                            d_inputs['r_b2g_I'][j, :]
+                        dr_b2g_B[:, k] += self.J2[:, k, j] * \
+                            d_inputs['r_b2g_I'][:, j]
         else:
             for k in range(3):
                 if 'O_BI' in d_inputs:
                     for u in range(3):
                         for v in range(3):
-                            d_inputs['O_BI'][u, v, :] += self.J1[:, k, u, v] * \
-                                dr_b2g_B[k, :]
+                            d_inputs['O_BI'][:, u, v] += self.J1[:, k, u, v] * \
+                                dr_b2g_B[:, k]
                 if 'r_b2g_I' in d_inputs:
                     for j in range(3):
-                        d_inputs['r_b2g_I'][j, :] += self.J2[:, k, j] * \
-                            dr_b2g_B[k, :]
+                        d_inputs['r_b2g_I'][:, j] += self.J2[:, k, j] * \
+                            dr_b2g_B[:, k]
 
 
 class Comm_VectorECI(ExplicitComponent):
@@ -1154,16 +1162,16 @@ class Comm_VectorECI(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('r_e2g_I', np.zeros((3, n)), units='km',
+        self.add_input('r_e2g_I', np.zeros((n, 3)), units='km',
                        desc='Position vector from earth to ground station in '
                             'Earth-centered inertial frame over time')
 
-        self.add_input('r_e2b_I', np.zeros((6, n)), units=None,
+        self.add_input('r_e2b_I', np.zeros((n, 6)), units=None,
                        desc='Position and velocity vector from earth to satellite '
                             'in Earth-centered inertial frame over time')
 
         # Outputs
-        self.add_output('r_b2g_I', np.zeros((3, n)), units='km',
+        self.add_output('r_b2g_I', np.zeros((n, 3)), units='km',
                         desc='Position vector from satellite to ground station '
                              'in Earth-centered inertial frame over time')
 
@@ -1171,7 +1179,7 @@ class Comm_VectorECI(ExplicitComponent):
         """
         Calculate outputs.
         """
-        outputs['r_b2g_I'] = inputs['r_e2g_I'] - inputs['r_e2b_I'][:3, :]
+        outputs['r_b2g_I'] = inputs['r_e2g_I'] - inputs['r_e2b_I'][:, 3:]
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
@@ -1183,14 +1191,14 @@ class Comm_VectorECI(ExplicitComponent):
             if 'r_e2g_I' in d_inputs:
                 dr_b2g_I += d_inputs['r_e2g_I']
             if 'r_e2b_I' in d_inputs:
-                dr_b2g_I += -d_inputs['r_e2b_I'][:3, :]
+                dr_b2g_I += -d_inputs['r_e2b_I'][:, 3:]
 
         else:
             if 'r_e2g_I' in d_inputs:
                 d_inputs['r_e2g_I'] += dr_b2g_I
             if 'r_e2b_I' in d_inputs:
                 dr_e2b_I = np.zeros(d_inputs['r_e2b_I'].shape)
-                dr_e2b_I[:3, :] += -dr_b2g_I
+                dr_e2b_I[:, 3:] += -dr_b2g_I
                 d_inputs['r_e2b_I'] += dr_e2b_I
 
 
@@ -1207,7 +1215,7 @@ class Comm_VectorSpherical(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('r_b2g_A', np.zeros((3, n)), units='km',
+        self.add_input('r_b2g_A', np.zeros((n, 3)), units='km',
                        desc='Position vector from satellite to ground station '
                             'in antenna angle frame over time')
 
@@ -1248,7 +1256,7 @@ class Comm_VectorSpherical(ExplicitComponent):
         """
         if mode == 'fwd':
             if 'r_b2g_A' in d_inputs:
-                r_b2g_A = d_inputs['r_b2g_A'].reshape((3 * self.n), order='F')
+                r_b2g_A = d_inputs['r_b2g_A'].reshape((3 * self.n))
                 if 'azimuthGS' in d_outputs:
                     d_outputs['azimuthGS'] += self.J1.dot(r_b2g_A)
                 if 'elevationGS' in d_outputs:
@@ -1257,7 +1265,7 @@ class Comm_VectorSpherical(ExplicitComponent):
             if 'r_b2g_A' in d_inputs:
                 if 'azimuthGS' in d_outputs:
                     az_GS = d_outputs['azimuthGS']
-                    d_inputs['r_b2g_A'] += (self.J1T.dot(az_GS)).reshape((3, self.n), order='F')
+                    d_inputs['r_b2g_A'] += (self.J1T.dot(az_GS)).reshape((self.n, 3))
                 if 'elevationGS' in d_outputs:
                     el_GS = d_outputs['elevationGS']
-                    d_inputs['r_b2g_A'] += (self.J2T.dot(el_GS)).reshape((3, self.n), order='F')
+                    d_inputs['r_b2g_A'] += (self.J2T.dot(el_GS)).reshape((self.n, 3))

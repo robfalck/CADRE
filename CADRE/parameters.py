@@ -47,10 +47,10 @@ class BsplineParameters(ExplicitComponent):
         self.add_output('P_comm', np.ones((n, )), units='W',
                         desc='Communication power over time')
 
-        self.add_output('Gamma', 0.1*np.ones((n,)), units='rad',
+        self.add_output('Gamma', 0.1*np.ones((n, )), units='rad',
                         desc='Satellite roll angle over time')
 
-        self.add_output('Isetpt', 0.2*np.ones((12, n)), units='A',
+        self.add_output('Isetpt', 0.2*np.ones((n, 12)), units='A',
                         desc='Currents of the solar panels over time')
 
     def compute(self, inputs, outputs):
@@ -74,7 +74,7 @@ class BsplineParameters(ExplicitComponent):
         outputs['P_comm'] = self.B.dot(inputs['CP_P_comm'])
         outputs['Gamma'] = self.B.dot(inputs['CP_gamma'])
         for k in range(12):
-            outputs['Isetpt'][k, :] = self.B.dot(inputs['CP_Isetpt'][k, :])
+            outputs['Isetpt'][:, k] = self.B.dot(inputs['CP_Isetpt'][k, :])
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
@@ -89,7 +89,7 @@ class BsplineParameters(ExplicitComponent):
 
             if 'Isetpt' in d_outputs and 'CP_Isetpt' in d_inputs:
                 for k in range(12):
-                    d_outputs['Isetpt'][k, :] += self.B.dot(d_inputs['CP_Isetpt'][k, :])
+                    d_outputs['Isetpt'][:, k] += self.B.dot(d_inputs['CP_Isetpt'][k, :])
         else:
             if 'P_comm' in d_outputs and 'CP_P_comm' in d_inputs:
                 d_inputs['CP_P_comm'] += self.BT.dot(d_outputs['P_comm'])
@@ -99,4 +99,4 @@ class BsplineParameters(ExplicitComponent):
 
             if 'Isetpt' in d_outputs and 'CP_Isetpt' in d_inputs:
                 for k in range(12):
-                    d_inputs['CP_Isetpt'][k, :] += self.BT.dot(d_outputs['Isetpt'][k, :])
+                    d_inputs['CP_Isetpt'][k, :] += self.BT.dot(d_outputs['Isetpt'][:, k])

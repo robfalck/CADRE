@@ -72,7 +72,7 @@ class RK4(ExplicitComponent):
             self.ext_index_map[name] = len(ext)
 
             # TODO: Check that shape[-1]==self.n
-            ext.extend(var.reshape(-1, self.n))
+            ext.extend(np.atleast_2d(var).T)
 
         for name in fixed_external_vars:
             var = inputs[name]
@@ -289,13 +289,13 @@ class RK4(ExplicitComponent):
 
             # Collapse incoming a*b*...*c*n down to (ab...c)*n
             shape = dvar.shape
-            dvar = dvar.reshape((int(np.prod(shape[:-1])), shape[-1]))
+            dvar = dvar.reshape((shape[0], int(np.prod(shape[1:]))))
 
             i_ext = self.ext_index_map[name]
-            ext_length = np.prod(dvar[:, 0].shape)
+            ext_length = np.prod(dvar[0, :].shape)
             for j in range(n_time-1):
                 Jsub = self.Jx[j+1, i_ext:i_ext+ext_length, :]
-                J_arg = Jsub.T.dot(dvar[:, j])
+                J_arg = Jsub.dot(dvar[j, :])
                 result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1))
 
         # Time-invariant inputs

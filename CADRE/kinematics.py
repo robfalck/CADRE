@@ -54,16 +54,16 @@ def computepositionspherical(n, v):
     """
     azimuth, elevation = np.empty(n), np.empty(n)
 
-    r = np.sqrt(np.sum(v*v, 0))
+    r = np.sqrt(np.sum(v*v, 1))
     for i in range(n):
-        x = v[0, i]
-        y = v[1, i]
-        # z = v[2, i]
+        x = v[i, 0]
+        y = v[i, 1]
+        # z = v[i, 2]
         if r[i] < 1e-15:
             r[i] = 1e-5
         azimuth[i] = arctan(x, y)
 
-    elevation = np.arccos(v[2, :]/r)
+    elevation = np.arccos(v[:, 2]/r)
     return azimuth, elevation
 
 
@@ -105,9 +105,9 @@ def computepositionsphericaljacobian(n, nJ, v):
     Jj2 = np.empty(nJ)
 
     for i in range(n):
-        x = v[0, i]
-        y = v[1, i]
-        z = v[2, i]
+        x = v[i, 0]
+        y = v[i, 1]
+        z = v[i, 2]
         r = np.sqrt(x**2 + y**2 + z**2)
         if r < 1e-15:
             r = 1e-5
