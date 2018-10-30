@@ -74,6 +74,8 @@ class RK4(ExplicitComponent):
             # TODO: Check that shape[-1]==self.n
             if len(var.shape) < 2:
                 var = var.reshape(self.n, 1)
+            else:
+                var = var.reshape(self.n, -1)
             ext.extend(var.T)
 
         for name in fixed_external_vars:
@@ -295,13 +297,11 @@ class RK4(ExplicitComponent):
 
             i_ext = self.ext_index_map[name]
             ext_length = np.prod(dvar[0, :].shape)
-            try:
-                for j in range(n_time-1):
-                    Jsub = self.Jx[j+1, i_ext:i_ext+ext_length, :]
-                    J_arg = Jsub.T.dot(dvar[j, :].T).T
-                    result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1))
-            except:
-                pass
+            for j in range(n_time-1):
+                Jsub = self.Jx[j+1, i_ext:i_ext+ext_length, :]
+                J_arg = Jsub.T.dot(dvar[j, :].T).T
+                result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1))
+
         # Time-invariant inputs
         for name in self.options['fixed_external_vars']:
 
@@ -317,10 +317,12 @@ class RK4(ExplicitComponent):
                 dvar = dvar.flatten()
             i_ext = self.ext_index_map[name]
             ext_length = np.prod(dvar.shape)
+
             for j in range(n_time-1):
                 Jsub = self.Jx[j+1, i_ext:i_ext+ext_length, :]
-                J_arg = Jsub.T.dot(dvar)
-                result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1)).T
+                J_arg = Jsub.T.dot(dvar.T).T
+                result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1))
+
 
         # Initial State
         name = self.options['init_state_var']
