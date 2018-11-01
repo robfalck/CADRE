@@ -29,12 +29,12 @@ class Sun_LOS(ExplicitComponent):
     def setup(self):
         n = self.n
 
-        self.add_input('r_e2b_I', np.zeros((6, n), order='F'), units=None,
+        self.add_input('r_e2b_I', np.zeros((n, 6), order='F'), units=None,
                        desc='Position and velocity vectors from '
                             'Earth to satellite in Earth-centered '
                             'inertial frame over time.')
 
-        self.add_input('r_e2s_I', np.zeros((3, n), order='F'), units='km',
+        self.add_input('r_e2s_I', np.zeros((n, 3), order='F'), units='km',
                        desc='Position vector from Earth to sun in Earth-centered '
                             'inertial frame over time.')
 
@@ -50,8 +50,8 @@ class Sun_LOS(ExplicitComponent):
         LOS = outputs['LOS']
 
         for i in range(self.n):
-            r_b = r_e2b_I[:3, i]
-            r_s = r_e2s_I[:3, i]
+            r_b = r_e2b_I[i, :3]
+            r_s = r_e2s_I[i, :3]
             dot = np.dot(r_b, r_s)
             cross = np.cross(r_b, r_s)
             dist = np.sqrt(cross.dot(cross))
@@ -95,8 +95,8 @@ class Sun_LOS(ExplicitComponent):
         dLOS_drb = np.zeros(shape=(3, ), dtype=np.int)
 
         for i in range(self.n):
-            r_b = r_e2b_I[:3, i]
-            r_s = r_e2s_I[:3, i]
+            r_b = r_e2b_I[i, :3]
+            r_s = r_e2s_I[i, :3]
             Bx = crossMatrix(r_b)
             Sx = crossMatrix(-r_s)
             dot = np.dot(r_b, r_s)
@@ -143,22 +143,23 @@ class Sun_LOS(ExplicitComponent):
         """
         Matrix-vector product with the Jacobian.
         """
+        n = self.n
         dLOS = d_outputs['LOS']
 
         if mode == 'fwd':
             if 'r_e2b_I' in d_inputs:
-                r_e2b_I = d_inputs['r_e2b_I'][:].reshape((6*self.n), order='F')
+                r_e2b_I = d_inputs['r_e2b_I'][:].reshape((6*n), order='F')
                 dLOS += self.Jb.dot(r_e2b_I)
 
             if 'r_e2s_I' in d_inputs:
-                r_e2s_I = d_inputs['r_e2s_I'][:].reshape((3*self.n), order='F')
+                r_e2s_I = d_inputs['r_e2s_I'][:].reshape((3*n), order='F')
                 dLOS += self.Js.dot(r_e2s_I)
 
         else:
             if 'r_e2b_I' in d_inputs:
-                d_inputs['r_e2b_I'] += self.JbT.dot(dLOS).reshape((6, self.n), order='F')
+                d_inputs['r_e2b_I'] += self.JbT.dot(dLOS).reshape((n, 6), order='F')
             if 'r_e2s_I' in d_inputs:
-                d_inputs['r_e2s_I'] += self.JsT.dot(dLOS).reshape((3, self.n), order='F')
+                d_inputs['r_e2s_I'] += self.JsT.dot(dLOS).reshape((n, 3), order='F')
 
 
 def crossMatrix(v):
@@ -183,16 +184,16 @@ class Sun_PositionBody(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('O_BI', np.zeros((3, 3, n), order='F'), units=None,
+        self.add_input('O_BI', np.zeros((n, 3, 3), order='F'), units=None,
                        desc='Rotation matrix from the Earth-centered inertial frame '
                             'to the satellite frame.')
 
-        self.add_input('r_e2s_I', np.zeros((3, n), order='F'), units='km',
+        self.add_input('r_e2s_I', np.zeros((n, 3), order='F'), units='km',
                        desc='Position vector from Earth to Sun in Earth-centered '
                             'inertial frame over time.')
 
         # Outputs
-        self.add_output('r_e2s_B', np.zeros((3, n, ), order='F'), units='km',
+        self.add_output('r_e2s_B', np.zeros((n, 3), order='F'), units='km',
                         desc='Position vector from Earth to Sun in body-fixed '
                              'frame over time.')
 
@@ -221,22 +222,22 @@ class Sun_PositionBody(ExplicitComponent):
                 for k in range(3):
                     for u in range(3):
                         for v in range(3):
-                            dr_e2s_B[k, :] += self.J1[:, k, u, v] * d_inputs['O_BI'][u, v, :]
+                            dr_e2s_B[:, k] += self.J1[:, k, u, v] * d_inputs['O_BI'][:, u, v]
             if 'r_e2s_I' in d_inputs:
                 for k in range(3):
                     for j in range(3):
-                        dr_e2s_B[k, :] += self.J2[:, k, j] * d_inputs['r_e2s_I'][j, :]
+                        dr_e2s_B[:, k] += self.J2[:, k, j] * d_inputs['r_e2s_I'][:, j]
         else:
             for k in range(3):
                 if 'O_BI' in d_inputs:
                     dO_BI = d_inputs['O_BI']
                     for u in range(3):
                         for v in range(3):
-                            dO_BI[u, v, :] += self.J1[:, k, u, v] * dr_e2s_B[k, :]
+                            dO_BI[:, u, v] += self.J1[:, k, u, v] * dr_e2s_B[:, k]
                 if 'r_e2s_I' in d_inputs:
                     dr_e2s_I = d_inputs['r_e2s_I']
                     for j in range(3):
-                        dr_e2s_I[j, :] += self.J2[:, k, j] * dr_e2s_B[k, :]
+                        dr_e2s_I[:, j] += self.J2[:, k, j] * dr_e2s_B[:, k]
 
 
 class Sun_PositionECI(ExplicitComponent):
@@ -258,10 +259,10 @@ class Sun_PositionECI(ExplicitComponent):
         # Inputs
         self.add_input('LD', 0.0, units=None)
 
-        self.add_input('t', np.zeros((n, ), order='F'), units='s', desc='Time')
+        self.add_input('t', np.zeros((n, )), units='s', desc='Time')
 
         # Outputs
-        self.add_output('r_e2s_I', np.zeros((3, n, ), order='F'), units='km',
+        self.add_output('r_e2s_I', np.zeros((n, 3)), units='km',
                         desc='Position vector from Earth to Sun in Earth-centered '
                              'inertial frame over time.')
 
@@ -281,9 +282,9 @@ class Sun_PositionECI(ExplicitComponent):
             g = self.d2r*357.528 + self.d2r*0.9856003*T[i]
             Lambda = L + self.d2r*1.914666*np.sin(g) + self.d2r*0.01999464*np.sin(2*g)
             eps = self.d2r*23.439 - self.d2r*3.56e-7*T[i]
-            r_e2s_I[0, i] = np.cos(Lambda)
-            r_e2s_I[1, i] = np.sin(Lambda)*np.cos(eps)
-            r_e2s_I[2, i] = np.sin(Lambda)*np.sin(eps)
+            r_e2s_I[i, 0] = np.cos(Lambda)
+            r_e2s_I[i, 1] = np.sin(Lambda)*np.cos(eps)
+            r_e2s_I[i, 2] = np.sin(Lambda)*np.sin(eps)
 
     def compute_partials(self, inputs, partials):
         """
@@ -327,9 +328,9 @@ class Sun_PositionECI(ExplicitComponent):
             if 'LD' in d_inputs and 't' in d_inputs:
                 # TODO - Should split this up so we can hook one up but not the other.
                 dr_e2s_I[:] += (self.J.dot(d_inputs['LD'] +
-                                d_inputs['t']/3600./24.).reshape((3, self.n), order='F'))
+                                d_inputs['t']/3600./24.).reshape((self.n, 3)))
         else:
-            r_e2s_I = dr_e2s_I[:].reshape((3*self.n), order='F')
+            r_e2s_I = dr_e2s_I[:].reshape((3*self.n))
             if 'LD' in d_inputs:
                 d_inputs['LD'] += sum(self.JT.dot(r_e2s_I))
             if 't' in d_inputs:
@@ -350,12 +351,12 @@ class Sun_PositionSpherical(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('r_e2s_B', np.zeros((3, n)), units='km',
+        self.add_input('r_e2s_B', np.zeros((n, 3)), units='km',
                        desc='Position vector from Earth to Sun in body-fixed '
                             'frame over time.')
 
         # Outputs
-        self.add_output('azimuth', np.zeros((n,)), units='rad',
+        self.add_output('azimuth', np.zeros((n, )), units='rad',
                         desc='Ezimuth angle of the Sun in the body-fixed frame '
                              'over time.')
 
@@ -389,9 +390,11 @@ class Sun_PositionSpherical(ExplicitComponent):
         """
         Matrix-vector product with the Jacobian.
         """
+        n = self.n
+
         if mode == 'fwd':
             if 'r_e2s_B' in d_inputs:
-                r_e2s_B = d_inputs['r_e2s_B'].reshape((3*self.n), order='F')
+                r_e2s_B = d_inputs['r_e2s_B'].reshape((3*self.n))
                 if 'azimuth' in d_outputs:
                     d_outputs['azimuth'] += self.J1.dot(r_e2s_B)
                 if 'elevation' in d_outputs:
@@ -400,7 +403,7 @@ class Sun_PositionSpherical(ExplicitComponent):
             if 'r_e2s_B' in d_inputs:
                 if 'azimuth' in d_outputs:
                     azimuth = d_outputs['azimuth'][:]
-                    d_inputs['r_e2s_B'] += self.J1T.dot(azimuth).reshape((3, self.n), order='F')
+                    d_inputs['r_e2s_B'] += self.J1T.dot(azimuth).reshape((n, 3))
                 if 'elevation' in d_outputs:
                     elevation = d_outputs['elevation'][:]
-                    d_inputs['r_e2s_B'] += self.J2T.dot(elevation).reshape((3, self.n), order='F')
+                    d_inputs['r_e2s_B'] += self.J2T.dot(elevation).reshape((n, 3))

@@ -83,10 +83,11 @@ class TestCADRE(unittest.TestCase):
 
         # check partials
         # FIXME: several components fail check_partials
-        # partials = self.prob.check_partials()
-        # partials = self.prob.check_partials(compact_print=True, method='cs')
-        # partials = self.prob.check_partials(out_stream=None)
-        # assert_check_partials(partials, atol=1e-3, rtol=1e-3)
+        #partials = self.prob.check_partials()
+        partials = self.prob.check_partials(compact_print=True, method='cs')
+        #partials = self.prob.check_partials(out_stream=None)
+        # Only check relative
+        assert_check_partials(partials, atol=np.inf, rtol=5e-3)
 
     def test_Attitude_Angular(self):
         compname = 'Attitude_Angular'

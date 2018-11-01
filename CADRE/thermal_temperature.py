@@ -39,7 +39,7 @@ class ThermalTemperature(RK4):
         self.add_input('T0', 273.*np.ones((5, )), units='degK',
                        desc='Initial temperatures for the 4 fins and body')
 
-        self.add_input('exposedArea', np.zeros((7, 12, n_times)), units='m**2',
+        self.add_input('exposedArea', np.zeros((n_times, 7, 12)), units='m**2',
                        desc='Exposed area to the sun for each solar cell over time')
 
         self.add_input('cellInstd', np.ones((7, 12)), units=None,
@@ -52,7 +52,7 @@ class ThermalTemperature(RK4):
                        desc='Communication power over time')
 
         # Outputs
-        self.add_output('temperature', np.zeros((5, n_times)), units='degK',
+        self.add_output('temperature', np.zeros((n_times, 5)), units='degK',
                         desc='Temperature for the 4 fins and body over time.',
                         lower=50, upper=400)
 

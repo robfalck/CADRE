@@ -47,11 +47,11 @@ class BatterySOC(rk4.RK4):
         self.add_input('P_bat', np.zeros((n_times, )), units='W',
                        desc='Battery power over time')
 
-        self.add_input('temperature', np.zeros((5, n_times)), units='degK',
+        self.add_input('temperature', np.zeros((n_times, 5)), units='degK',
                        desc='Battery temperature over time')
 
         # Outputs
-        self.add_output('SOC', np.zeros((1, n_times)), units=None,
+        self.add_output('SOC', np.zeros((n_times, 1)), units=None,
                         desc='Battery state of charge over time')
 
         self.options['state_var'] = 'SOC'
@@ -134,10 +134,10 @@ class BatteryPower(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('SOC', np.zeros((1, n)), units=None,
+        self.add_input('SOC', np.zeros((n, 1)), units=None,
                        desc='Battery state of charge over time')
 
-        self.add_input('temperature', np.zeros((5, n)), units='degK',
+        self.add_input('temperature', np.zeros((n, 5)), units='degK',
                        desc='Battery temperature over time')
 
         self.add_input('P_bat', np.zeros((n, )), units='W',
@@ -155,8 +155,8 @@ class BatteryPower(ExplicitComponent):
         temperature = inputs['temperature']
         P_bat = inputs['P_bat']
 
-        self.exponential = (2.0 - np.exp(alpha*(temperature[4, :]-T0)/T0))
-        self.voc = 3.0 + np.expm1(SOC[0, :]) / (np.e-1)
+        self.exponential = (2.0 - np.exp(alpha*(temperature[:, 4]-T0)/T0))
+        self.voc = 3.0 + np.expm1(SOC[:, 0]) / (np.e-1)
         self.V = IR * self.voc * self.exponential
 
         outputs['I_bat'] = P_bat / self.V
@@ -171,8 +171,8 @@ class BatteryPower(ExplicitComponent):
 
         # dI_dP
         dV_dvoc = IR * self.exponential
-        dV_dT = - IR * self.voc * np.exp(alpha*(temperature[4, :] - T0)/T0) * alpha / T0
-        dVoc_dSOC = np.exp(SOC[0, :]) / (np.e-1)
+        dV_dT = - IR * self.voc * np.exp(alpha*(temperature[:, 4] - T0)/T0) * alpha / T0
+        dVoc_dSOC = np.exp(SOC[:, 0]) / (np.e-1)
 
         self.dI_dP = 1.0 / self.V
         tmp = -P_bat/(self.V**2)
@@ -191,19 +191,19 @@ class BatteryPower(ExplicitComponent):
                 dI_bat += self.dI_dP * d_inputs['P_bat']
 
             if 'temperature' in d_inputs:
-                dI_bat += self.dI_dT * d_inputs['temperature'][4, :]
+                dI_bat += self.dI_dT * d_inputs['temperature'][:, 4]
 
             if 'SOC' in d_inputs:
-                dI_bat += self.dI_dSOC * d_inputs['SOC'][0, :]
+                dI_bat += self.dI_dSOC * d_inputs['SOC'][:, 0]
         else:
             if 'P_bat' in d_inputs:
                 d_inputs['P_bat'] += self.dI_dP * dI_bat
 
             if 'temperature' in d_inputs:
-                d_inputs['temperature'][4, :] += self.dI_dT * dI_bat
+                d_inputs['temperature'][:, 4] += self.dI_dT * dI_bat
 
             if 'SOC' in d_inputs:
-                d_inputs['SOC'][0, :] += self.dI_dSOC * dI_bat
+                d_inputs['SOC'][:, 0] += self.dI_dSOC * dI_bat
 
 
 class BatteryConstraints(ExplicitComponent):
@@ -234,7 +234,7 @@ class BatteryConstraints(ExplicitComponent):
         self.add_input('I_bat', np.zeros((n, )), units='A',
                        desc='Battery current over time')
 
-        self.add_input('SOC', np.zeros((1, n)), units=None,
+        self.add_input('SOC', np.zeros((n, )), units=None,
                        desc='Battery state of charge over time')
 
         # Outputs
@@ -283,9 +283,9 @@ class BatteryConstraints(ExplicitComponent):
                     d_outputs['ConDs'] -= np.dot(self.dDs_dg, d_inputs['I_bat'])
             if 'SOC' in d_inputs:
                 if 'ConS0' in d_outputs:
-                    d_outputs['ConS0'] -= np.dot(self.dS0_dg, d_inputs['SOC'][0, :])
+                    d_outputs['ConS0'] -= np.dot(self.dS0_dg, d_inputs['SOC'])
                 if 'ConS1' in d_outputs:
-                    d_outputs['ConS1'] += np.dot(self.dS1_dg, d_inputs['SOC'][0, :])
+                    d_outputs['ConS1'] += np.dot(self.dS1_dg, d_inputs['SOC'])
         else:
             if 'I_bat' in d_inputs:
                 dI_bat = d_inputs['I_bat']

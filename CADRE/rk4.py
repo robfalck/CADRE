@@ -61,7 +61,7 @@ class RK4(ExplicitComponent):
         self.y = outputs[state_var]
         self.y0 = inputs[init_state_var]
 
-        self.n_states, self.n = self.y.shape
+        self.n, self.n_states = self.y.shape
         self.ny = self.n_states*self.n
         self.nJ = self.n_states*(self.n + self.n_states*(self.n-1))
 
@@ -72,7 +72,11 @@ class RK4(ExplicitComponent):
             self.ext_index_map[name] = len(ext)
 
             # TODO: Check that shape[-1]==self.n
-            ext.extend(var.reshape(-1, self.n))
+            if len(var.shape) < 2:
+                var = var.reshape(self.n, 1)
+            else:
+                var = var.reshape(self.n, -1)
+            ext.extend(var.T)
 
         for name in fixed_external_vars:
             var = inputs[name]
@@ -167,7 +171,7 @@ class RK4(ExplicitComponent):
         self.y[0:n_state] = self.y0
 
         # Cache f_dot for use in linearize()
-        size = (n_state, self.n)
+        size = (self.n, n_state)
         self.a = np.zeros(size)
         self.b = np.zeros(size)
         self.c = np.zeros(size)
@@ -183,16 +187,16 @@ class RK4(ExplicitComponent):
             # Next state a function of previous state
             y = self.y[k1:k2]
 
-            self.a[:, k] = a = self.f_dot(ex, y)
-            self.b[:, k] = b = self.f_dot(ex, y + h/2.*a)
-            self.c[:, k] = c = self.f_dot(ex, y + h/2.*b)
-            self.d[:, k] = d = self.f_dot(ex, y + h*c)
+            self.a[k, :] = a = self.f_dot(ex, y)
+            self.b[k, :] = b = self.f_dot(ex, y + h/2.*a)
+            self.c[k, :] = c = self.f_dot(ex, y + h/2.*b)
+            self.d[k, :] = d = self.f_dot(ex, y + h*c)
 
             self.y[n_state+k1:n_state+k2] = \
                 y + h/6.*(a + 2*(b + c) + d)
 
         state_var_name = self.name_map['y']
-        outputs[state_var_name][:] = self.y.T.reshape((n_time, n_state)).T
+        outputs[state_var_name][:] = self.y.T.reshape((n_time, n_state))
 
     def compute_partials(self, inputs, partials):
         """
@@ -218,9 +222,9 @@ class RK4(ExplicitComponent):
 
             y = self.y[k1:k2]
 
-            a = self.a[:, k]
-            b = self.b[:, k]
-            c = self.c[:, k]
+            a = self.a[k, :]
+            b = self.b[k, :]
+            c = self.c[k, :]
 
             # State vars
             df_dy = self.df_dy(ex, y)
@@ -274,7 +278,7 @@ class RK4(ExplicitComponent):
         # Jx --> (n_times, n_external, n_states)
         n_state = self.n_states
         n_time = self.n
-        result = np.zeros((n_state, n_time))
+        result = np.zeros((n_time, n_state))
 
         # Time-varying inputs
         for name in self.options['external_vars']:
@@ -289,14 +293,14 @@ class RK4(ExplicitComponent):
 
             # Collapse incoming a*b*...*c*n down to (ab...c)*n
             shape = dvar.shape
-            dvar = dvar.reshape((int(np.prod(shape[:-1])), shape[-1]))
+            dvar = dvar.reshape((shape[0], int(np.prod(shape[1:]))))
 
             i_ext = self.ext_index_map[name]
-            ext_length = np.prod(dvar[:, 0].shape)
+            ext_length = np.prod(dvar[0, :].shape)
             for j in range(n_time-1):
                 Jsub = self.Jx[j+1, i_ext:i_ext+ext_length, :]
-                J_arg = Jsub.T.dot(dvar[:, j])
-                result[:, j+1:n_time] += np.tile(J_arg, (n_time-j-1, 1)).T
+                J_arg = Jsub.T.dot(dvar[j, :].T).T
+                result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1))
 
         # Time-invariant inputs
         for name in self.options['fixed_external_vars']:
@@ -313,10 +317,12 @@ class RK4(ExplicitComponent):
                 dvar = dvar.flatten()
             i_ext = self.ext_index_map[name]
             ext_length = np.prod(dvar.shape)
+
             for j in range(n_time-1):
                 Jsub = self.Jx[j+1, i_ext:i_ext+ext_length, :]
-                J_arg = Jsub.T.dot(dvar)
-                result[:, j+1:n_time] += np.tile(J_arg, (n_time-j-1, 1)).T
+                J_arg = Jsub.T.dot(dvar.T).T
+                result[j+1:n_time, :] += np.tile(J_arg, (n_time-j-1, 1))
+
 
         # Initial State
         name = self.options['init_state_var']
@@ -326,10 +332,10 @@ class RK4(ExplicitComponent):
             dvar = d_inputs[name]
             if len(np.nonzero(dvar)[0]) > 0:
                 fact = np.eye(self.n_states)
-                result[:, 0] = dvar
+                result[0, :] = dvar
                 for j in range(1, n_time):
                     fact = fact.dot(-self.Jy[j-1, :, :])
-                    result[:, j] += fact.dot(dvar)
+                    result[j, :] += fact.dot(dvar)
 
         return result
 
@@ -341,7 +347,7 @@ class RK4(ExplicitComponent):
         n_time = self.n
         result = {}
 
-        argsv = d_outputs[self.options['state_var']].T
+        argsv = d_outputs[self.options['state_var']]
         argsum = np.zeros(argsv.shape)
 
         # Calculate these once, and use for every output
@@ -360,12 +366,12 @@ class RK4(ExplicitComponent):
             dext_var = d_inputs[name]
             i_ext = self.ext_index_map[name]
             ext_length = np.prod(dext_var.shape) // n_time
-            result[name] = np.zeros((ext_length, n_time))
+            result[name] = np.zeros((n_time, ext_length))
 
             i_ext_end = i_ext + ext_length
             for k in nonzero_k:
                 Jsub = self.Jx[k + 1, i_ext:i_ext_end, :]
-                result[name][:, k] += Jsub.dot(argsum[k, :])
+                result[name][k, :] += Jsub.dot(argsum[k, :])
 
         # Time-invariant inputs
         for name in self.options['fixed_external_vars']:

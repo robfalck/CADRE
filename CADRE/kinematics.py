@@ -31,7 +31,7 @@ def computepositionrotd(n, vects, mat):
     """
     result = np.empty(vects.shape)
     for i in range(n):
-        result[:, i] = np.dot(mat[:, :, i], vects[:, i])
+        result[i, :] = np.dot(mat[i, :, :], vects[i, :])
     return result
 
 
@@ -43,11 +43,9 @@ def computepositionrotdjacobian(n, v1, O_21):
 
     for k in range(0, 3):
         for v in range(0, 3):
-            J1[:, k, k, v] = v1[v, :]
+            J1[:, k, k, v] = v1[:, v]
 
-    J2 = np.transpose(O_21, (2, 0, 1))
-
-    return J1, J2
+    return J1, O_21
 
 
 def computepositionspherical(n, v):
@@ -56,16 +54,16 @@ def computepositionspherical(n, v):
     """
     azimuth, elevation = np.empty(n), np.empty(n)
 
-    r = np.sqrt(np.sum(v*v, 0))
+    r = np.sqrt(np.sum(v*v, 1))
     for i in range(n):
-        x = v[0, i]
-        y = v[1, i]
-        # z = v[2, i]
+        x = v[i, 0]
+        y = v[i, 1]
+        # z = v[i, 2]
         if r[i] < 1e-15:
             r[i] = 1e-5
         azimuth[i] = arctan(x, y)
 
-    elevation = np.arccos(v[2, :]/r)
+    elevation = np.arccos(v[:, 2]/r)
     return azimuth, elevation
 
 
@@ -107,9 +105,9 @@ def computepositionsphericaljacobian(n, nJ, v):
     Jj2 = np.empty(nJ)
 
     for i in range(n):
-        x = v[0, i]
-        y = v[1, i]
-        z = v[2, i]
+        x = v[i, 0]
+        y = v[i, 1]
+        z = v[i, 2]
         r = np.sqrt(x**2 + y**2 + z**2)
         if r < 1e-15:
             r = 1e-5

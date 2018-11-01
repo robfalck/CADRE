@@ -38,11 +38,13 @@ class Orbit_Dynamics(rk4.RK4):
         self.options['init_state_var'] = 'r_e2b_I0'
 
     def setup(self):
+        n = self.n_times
+
         self.add_input('r_e2b_I0', np.zeros((6, )), units=None,  # fd_step=1e-2,
                        desc='Initial position and velocity vectors from earth to '
                             'satellite in Earth-centered inertial frame')
 
-        self.add_output('r_e2b_I', 1000.0*np.ones((6, self.n_times)), units=None,
+        self.add_output('r_e2b_I', 1000.0*np.ones((n, 6)), units=None,
                         desc='Position and velocity vectors from earth to satellite '
                              'in Earth-centered inertial frame over time')
 
@@ -161,7 +163,7 @@ class Orbit_Initial(ExplicitComponent):
         self.add_input('trueAnomaly', 337.987)
 
         # Outputs
-        self.add_output('r_e2b_I0', np.ones((6,)), units=None,
+        self.add_output('r_e2b_I0', np.ones((6, )), units=None,
                         desc='Initial position and velocity vectors from Earth '
                              'to satellite in Earth-centered inertial frame')
 
