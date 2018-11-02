@@ -14,7 +14,7 @@ from CADRE.test.util import load_validation_data
 
 
 # set verbose to True for debugging
-verbose = False
+verbose = True
 
 
 class TestCADRE(unittest.TestCase):
@@ -60,6 +60,13 @@ class TestCADRE(unittest.TestCase):
             if var in setd:
                 actual = setd[var]
                 computed = prob[var]
+
+                # Pickle was recorded with different array order.
+                nn = len(actual.shape)
+                if nn > 1 and actual.shape[-1] == 1500:
+                    zz = [nn-1]
+                    zz.extend(np.arange(nn-1))
+                    actual = np.transpose(actual, axes=zz)
 
                 if isinstance(computed, np.ndarray):
                     rel = np.linalg.norm(actual - computed) / np.linalg.norm(actual)

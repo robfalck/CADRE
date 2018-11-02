@@ -38,8 +38,22 @@ class Attitude_Angular(ExplicitComponent):
         self.dw_dOdot = np.zeros((n, 3, 3, 3))
         self.dw_dO = np.zeros((n, 3, 3, 3))
 
+        row = np.array([1, 1, 1, 2, 2, 2, 0, 0, 0])
+        col = np.array([6, 7, 8, 0, 1, 2, 3, 4, 5])
+        rows = np.tile(row, n) + np.repeat(3*np.arange(n), 9)
+        cols = np.tile(col, n) + np.repeat(9*np.arange(n), 9)
 
-        self.declare_partials('w_B', 'O_BI')
+        self.declare_partials('w_B', 'O_BI', rows=rows, cols=cols)
+
+        self.dw_dOdot = np.zeros((n, 3, 3, 3))
+        self.dw_dO = np.zeros((n, 3, 3, 3))
+
+        row = np.array([2, 2, 2, 0, 0, 0, 1, 1, 1])
+        col = np.array([3, 4, 5, 6, 7, 8, 0, 1, 2])
+        rows = np.tile(row, n) + np.repeat(3*np.arange(n), 9)
+        cols = np.tile(col, n) + np.repeat(9*np.arange(n), 9)
+
+        self.declare_partials('w_B', 'Odot_BI', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
@@ -49,10 +63,9 @@ class Attitude_Angular(ExplicitComponent):
         Odot_BI = inputs['Odot_BI']
         w_B = outputs['w_B']
 
-        for i in range(0, self.n):
-            w_B[i, 0] = np.dot(Odot_BI[i, 2, :], O_BI[i, 1, :])
-            w_B[i, 1] = np.dot(Odot_BI[i, 0, :], O_BI[i, 2, :])
-            w_B[i, 2] = np.dot(Odot_BI[i, 1, :], O_BI[i, 0, :])
+        w_B[:, 0] = np.einsum("ij,ij->i", Odot_BI[:, 2, :], O_BI[:, 1, :])
+        w_B[:, 1] = np.einsum("ij,ij->i", Odot_BI[:, 0, :], O_BI[:, 2, :])
+        w_B[:, 2] = np.einsum("ij,ij->i", Odot_BI[:, 1, :], O_BI[:, 0, :])
 
     def compute_partials(self, inputs, partials):
         """
@@ -61,42 +74,8 @@ class Attitude_Angular(ExplicitComponent):
         O_BI = inputs['O_BI']
         Odot_BI = inputs['Odot_BI']
 
-        for i in range(0, self.n):
-            self.dw_dOdot[i, 0, 2, :] = O_BI[i, 1, :]
-            self.dw_dO[i, 0, 1, :] = Odot_BI[i, 2, :]
-
-            self.dw_dOdot[i, 1, 0, :] = O_BI[i, 2, :]
-            self.dw_dO[i, 1, 2, :] = Odot_BI[i, 0, :]
-
-            self.dw_dOdot[i, 2, 1, :] = O_BI[i, 0, :]
-            self.dw_dO[i, 2, 0, :] = Odot_BI[i, 1, :]
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dw_B = d_outputs['w_B']
-
-        if mode == 'fwd':
-            for k in range(3):
-                for i in range(3):
-                    for j in range(3):
-                        if 'O_BI' in d_inputs:
-                            dw_B[:, k] += self.dw_dO[:, k, i, j] * \
-                                d_inputs['O_BI'][:, i, j]
-                        if 'Odot_BI' in d_inputs:
-                            dw_B[:, k] += self.dw_dOdot[:, k, i, j] * \
-                                d_inputs['Odot_BI'][:, i, j]
-        else:
-            for k in range(3):
-                for i in range(3):
-                    for j in range(3):
-                        if 'O_BI' in d_inputs:
-                            d_inputs['O_BI'][:, i, j] += self.dw_dO[:, k, i, j] * \
-                                dw_B[:, k]
-                        if 'Odot_BI' in d_inputs:
-                            d_inputs['Odot_BI'][:, i, j] += self.dw_dOdot[:, k, i, j] * \
-                                dw_B[:, k]
+        partials['w_B', 'O_BI'] = Odot_BI.flatten()
+        partials['w_B', 'Odot_BI'] = O_BI.flatten()
 
 
 class Attitude_AngularRates(ExplicitComponent):

@@ -71,9 +71,9 @@ class ThermalTemperature(RK4):
         # implementation of fixTemps from Thermal_Temperature.f90
         for i in range(0, self.n_times):
             for k in range(0, 5):
-                temperature[k, i] = inputs['T0'][k]
-                if temperature[k, i] < 0:
-                    temperature[k, i] = 0.
+                temperature[i, k] = inputs['T0'][k]
+                if temperature[i, k] < 0:
+                    temperature[i, k] = 0.
 
         super(ThermalTemperature, self).compute(inputs, outputs)
 
