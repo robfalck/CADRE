@@ -106,7 +106,7 @@ class TestCADRE(unittest.TestCase):
         state0 = []
 
         self.setup(compname, inputs, state0)
-        self.prob.model.comp.h = 0.01
+        #self.prob.model.comp.h = 0.01
         self.prob.run_model()
         self.compare_derivatives(inputs+state0, outputs)
 

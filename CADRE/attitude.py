@@ -1,8 +1,8 @@
 """
 Attitude discipline for CADRE.
 """
-
 from six.moves import range
+
 import numpy as np
 
 from openmdao.api import ExplicitComponent
@@ -99,6 +99,9 @@ class Attitude_Angular(ExplicitComponent):
 class Attitude_AngularRates(ExplicitComponent):
     """
     Calculates time derivative of angular velocity vector.
+
+    This time derivative is a central difference at interior time points, and forward/backward
+    at the start and end time.
     """
 
     def __init__(self, n=2, h=28.8):
@@ -109,6 +112,7 @@ class Attitude_AngularRates(ExplicitComponent):
 
     def setup(self):
         n = self.n
+        h = self.h
 
         # Inputs
         self.add_input('w_B', np.zeros((n, 3)), units='1/s',
@@ -118,45 +122,42 @@ class Attitude_AngularRates(ExplicitComponent):
         self.add_output('wdot_B', np.zeros((n, 3)), units='1/s**2',
                         desc='Time derivative of w_B over time')
 
+        # Derivatives
+
+        # Upper and Lower Diag
+        row1 = np.arange(3*(n-1))
+        col1 = row1 + 3
+        val1a = 0.5 * np.ones(3*(n-1))
+        val1a[:3] = 1.0
+        val1b = 0.5 * np.ones(3*(n-1))
+        val1b[-3:] = 1.0
+
+        val1a *= (1.0 / h)
+        val1b *= (1.0 / h)
+
+        # Central Diag
+        row_col2 = np.array((0, 1, 2, 3*n-3, 3*n-2, 3*n-1))
+        val2 = np.array((-1.0, -1.0, -1.0, 1.0, 1.0, 1.0)) * (1.0 / h)
+
+        rows = np.concatenate((row1, col1, row_col2))
+        cols = np.concatenate((col1, row1, row_col2))
+        val = np.concatenate((val1a, -val1b, val2))
+
+        self.declare_partials('wdot_B', 'w_B', rows=rows, cols=cols, val=val)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
-        w_B = inputs['w_B']
         h = self.h
+
+        w_B = inputs['w_B']
         wdot_B = outputs['wdot_B']
 
         wdot_B[0, :] = w_B[1, :] - w_B[0, :]
-        wdot_B[1:-1, :] = (w_B[2:, :] - w_B[:-2, :]) / 2.0
+        wdot_B[1:-1, :] = (w_B[2:, :] - w_B[:-2, :]) * 0.5
         wdot_B[-1, :] = w_B[-1, :] - w_B[-2, :]
-        wdot_B *= 1.0/h
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        h = self.h
-
-        dwdot_B = d_outputs['wdot_B']
-
-        if mode == 'fwd':
-            if 'w_B' in d_inputs:
-                dwdot_B[0, :] += d_inputs['w_B'][1, :] / h
-                dwdot_B[0, :] -= d_inputs['w_B'][0, :] / h
-                dwdot_B[1:-1, :] += d_inputs['w_B'][2:, :] / 2.0 / h
-                dwdot_B[1:-1, :] -= d_inputs['w_B'][:-2, :] / 2.0 / h
-                dwdot_B[-1, :] += d_inputs['w_B'][-1, :] / h
-                dwdot_B[-1, :] -= d_inputs['w_B'][-2, :] / h
-        else:
-            if 'w_B' in d_inputs:
-                w_B = np.zeros(d_inputs['w_B'].shape)
-                w_B[1, :] += dwdot_B[0, :] / h
-                w_B[0, :] -= dwdot_B[0, :] / h
-                w_B[2:, :] += dwdot_B[1:-1, :] / 2.0 / h
-                w_B[:-2, :] -= dwdot_B[1:-1, :] / 2.0 / h
-                w_B[-1, :] += dwdot_B[-1, :] / h
-                w_B[-2, :] -= dwdot_B[-1, :] / h
-                d_inputs['w_B'] += w_B
+        wdot_B *= 1.0 / h
 
 
 class Attitude_Attitude(ExplicitComponent):
