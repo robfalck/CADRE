@@ -38,6 +38,9 @@ class Attitude_Angular(ExplicitComponent):
         self.dw_dOdot = np.zeros((n, 3, 3, 3))
         self.dw_dO = np.zeros((n, 3, 3, 3))
 
+
+        self.declare_partials('w_B', 'O_BI')
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
