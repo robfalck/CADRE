@@ -104,8 +104,6 @@ class Attitude_AngularRates(ExplicitComponent):
         self.add_output('wdot_B', np.zeros((n, 3)), units='1/s**2',
                         desc='Time derivative of w_B over time')
 
-        # Derivatives
-
         # Upper and Lower Diag
         row1 = np.arange(3*(n-1))
         col1 = row1 + 3
@@ -144,7 +142,7 @@ class Attitude_AngularRates(ExplicitComponent):
 
 class Attitude_Attitude(ExplicitComponent):
     """
-    Coordinate transformation from the interial plane to the rolled
+    Coordinate transformation from the inertial plane to the rolled
     (forward facing) plane.
     """
 
@@ -165,8 +163,6 @@ class Attitude_Attitude(ExplicitComponent):
         super(Attitude_Attitude, self).__init__()
 
         self.n = n
-
-        self.dO_dr = np.zeros((n, 3, 3, 6))
 
     def setup(self):
         n = self.n
@@ -250,8 +246,8 @@ class Attitude_Attitude(ExplicitComponent):
             for k in range(0, 3):
                 dr_dr[k, k] += 1.0 / normr
                 dv_dv[k, k] += 1.0 / normv
-                dr_dr[:, k] -= r_e2b_I[i, 0:3] * r_e2b_I[i, k] / normr ** 3
-                dv_dv[:, k] -= r_e2b_I[i, 3:] * r_e2b_I[i, 3 + k] / normv ** 3
+                dr_dr[:, k] -= r * r_e2b_I[i, k] / normr ** 2
+                dv_dv[:, k] -= v * r_e2b_I[i, 3 + k] / normv ** 2
 
             vx = np.zeros((3, 3))
             vx[0, :] = (0., -v[2], v[1])
@@ -279,27 +275,6 @@ class Attitude_Attitude(ExplicitComponent):
 
             self.dO_dr[i, 2, :, 3:] = -dv_dv
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dO_RI = d_outputs['O_RI']
-
-        if mode == 'fwd':
-            if 'r_e2b_I' in d_inputs:
-                for k in range(3):
-                    for j in range(3):
-                        for i in range(6):
-                            dO_RI[:, k, j] += self.dO_dr[:, k, j, i] * \
-                                d_inputs['r_e2b_I'][:, i]
-        else:
-            if 'r_e2b_I' in d_inputs:
-                for k in range(3):
-                    for j in range(3):
-                        for i in range(6):
-                            d_inputs['r_e2b_I'][:, i] += self.dO_dr[:, k, j, i] * \
-                                dO_RI[:, k, j]
-
 
 class Attitude_Roll(ExplicitComponent):
     """
@@ -322,7 +297,6 @@ class Attitude_Roll(ExplicitComponent):
                         desc='Rotation matrix from body-fixed frame to rolled '
                         'body-fixed frame over time')
 
-        self.dO_dg = np.zeros((n, 3, 3))
 
     def compute(self, inputs, outputs):
         """
