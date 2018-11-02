@@ -934,7 +934,7 @@ class Comm_LOS(ExplicitComponent):
         CommLOS = outputs['CommLOS']
 
         Rb = 100.0
-        for i in range(n, 0):
+        for i in range(n):
             proj = np.dot(r_b2g_I[i, :], r_e2g_I[i, :]) / self.Re
 
             if proj > 0:
@@ -1179,7 +1179,7 @@ class Comm_VectorECI(ExplicitComponent):
         """
         Calculate outputs.
         """
-        outputs['r_b2g_I'] = inputs['r_e2g_I'] - inputs['r_e2b_I'][:, 3:]
+        outputs['r_b2g_I'] = inputs['r_e2g_I'] - inputs['r_e2b_I'][:, :3]
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
@@ -1191,14 +1191,14 @@ class Comm_VectorECI(ExplicitComponent):
             if 'r_e2g_I' in d_inputs:
                 dr_b2g_I += d_inputs['r_e2g_I']
             if 'r_e2b_I' in d_inputs:
-                dr_b2g_I += -d_inputs['r_e2b_I'][:, 3:]
+                dr_b2g_I += -d_inputs['r_e2b_I'][:, :3]
 
         else:
             if 'r_e2g_I' in d_inputs:
                 d_inputs['r_e2g_I'] += dr_b2g_I
             if 'r_e2b_I' in d_inputs:
                 dr_e2b_I = np.zeros(d_inputs['r_e2b_I'].shape)
-                dr_e2b_I[:, 3:] += -dr_b2g_I
+                dr_e2b_I[:, :3] += -dr_b2g_I
                 d_inputs['r_e2b_I'] += dr_e2b_I
 
 

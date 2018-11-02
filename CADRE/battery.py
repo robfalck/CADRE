@@ -134,7 +134,7 @@ class BatteryPower(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('SOC', np.zeros((n, 1)), units=None,
+        self.add_input('SOC', np.zeros((n, )), units=None,
                        desc='Battery state of charge over time')
 
         self.add_input('temperature', np.zeros((n, 5)), units='degK',
@@ -156,7 +156,7 @@ class BatteryPower(ExplicitComponent):
         P_bat = inputs['P_bat']
 
         self.exponential = (2.0 - np.exp(alpha*(temperature[:, 4]-T0)/T0))
-        self.voc = 3.0 + np.expm1(SOC[:, 0]) / (np.e-1)
+        self.voc = 3.0 + np.expm1(SOC) / (np.e-1)
         self.V = IR * self.voc * self.exponential
 
         outputs['I_bat'] = P_bat / self.V
@@ -172,7 +172,7 @@ class BatteryPower(ExplicitComponent):
         # dI_dP
         dV_dvoc = IR * self.exponential
         dV_dT = - IR * self.voc * np.exp(alpha*(temperature[:, 4] - T0)/T0) * alpha / T0
-        dVoc_dSOC = np.exp(SOC[:, 0]) / (np.e-1)
+        dVoc_dSOC = np.exp(SOC) / (np.e-1)
 
         self.dI_dP = 1.0 / self.V
         tmp = -P_bat/(self.V**2)
@@ -194,7 +194,7 @@ class BatteryPower(ExplicitComponent):
                 dI_bat += self.dI_dT * d_inputs['temperature'][:, 4]
 
             if 'SOC' in d_inputs:
-                dI_bat += self.dI_dSOC * d_inputs['SOC'][:, 0]
+                dI_bat += self.dI_dSOC * d_inputs['SOC']
         else:
             if 'P_bat' in d_inputs:
                 d_inputs['P_bat'] += self.dI_dP * dI_bat
@@ -203,7 +203,7 @@ class BatteryPower(ExplicitComponent):
                 d_inputs['temperature'][:, 4] += self.dI_dT * dI_bat
 
             if 'SOC' in d_inputs:
-                d_inputs['SOC'][:, 0] += self.dI_dSOC * dI_bat
+                d_inputs['SOC'] += self.dI_dSOC * dI_bat
 
 
 class BatteryConstraints(ExplicitComponent):
