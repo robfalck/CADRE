@@ -177,6 +177,21 @@ class Attitude_Attitude(ExplicitComponent):
                         desc='Rotation matrix from rolled body-fixed frame to '
                              'Earth-centered inertial frame over time')
 
+        row1 = np.repeat(np.arange(3), 3)
+        col1 = np.tile(np.arange(3), 3)
+        col2 = col1 + 3
+        row3 = row1 + 3
+        row5 = row1 + 6
+
+        row = np.concatenate([row1, row1, row3, row3, row5])
+        col = np.concatenate([col1, col2, col1, col2, col2])
+
+        rows = np.tile(row, n) + np.repeat(9*np.arange(n), 45)
+        cols = np.tile(col, n) + np.repeat(6*np.arange(n), 45)
+
+        self.declare_partials('O_RI', 'r_e2b_I', rows=rows, cols=cols)
+
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -266,14 +281,14 @@ class Attitude_Attitude(ExplicitComponent):
             djB_dv[:, 1] = -np.dot(self.dvx_dv[:, :, 1], iB)
             djB_dv[:, 2] = -np.dot(self.dvx_dv[:, :, 2], iB)
 
-            self.dO_dr[i, 0, :, 0:3] = np.dot(diB_dr, dr_dr)
-            self.dO_dr[i, 0, :, 3:] = np.dot(diB_dv, dv_dv)
+            n0 = i*45
+            partials['O_RI', 'r_e2b_I'][n0:n0+9] = np.dot(diB_dr, dr_dr).flatten()
+            partials['O_RI', 'r_e2b_I'][n0+9:n0+18] = np.dot(diB_dv, dv_dv).flatten()
 
-            self.dO_dr[i, 1, :, 0:3] = np.dot(np.dot(djB_diB, diB_dr), dr_dr)
-            self.dO_dr[i, 1, :, 3:] = np.dot(np.dot(djB_diB, diB_dv) + djB_dv,
-                                             dv_dv)
+            partials['O_RI', 'r_e2b_I'][n0+18:n0+27] = np.dot(np.dot(djB_diB, diB_dr), dr_dr).flatten()
+            partials['O_RI', 'r_e2b_I'][n0+27:n0+36] = np.dot(np.dot(djB_diB, diB_dv) + djB_dv, dv_dv).flatten()
 
-            self.dO_dr[i, 2, :, 3:] = -dv_dv
+            partials['O_RI', 'r_e2b_I'][n0+36:n0+45] = -dv_dv.flatten()
 
 
 class Attitude_Roll(ExplicitComponent):
@@ -293,10 +308,14 @@ class Attitude_Roll(ExplicitComponent):
                        desc='Satellite roll angle over time')
 
         # Outputs
-        self.add_output('O_BR', np.zeros((n, 3, 3)), units=None,
-                        desc='Rotation matrix from body-fixed frame to rolled '
-                        'body-fixed frame over time')
+        self.add_output('O_BR', np.zeros((n, 3, 3)), units=None,\
+                        desc='Rotation matrix from body-fixed frame to rolled ' 'body-fixed\
+                        frame over time')
 
+        rows = np.tile(9*np.arange(n), 4) + np.repeat(np.array([0, 1, 3, 4]), n)
+        cols = np.tile(np.arange(n), 4)
+
+        self.declare_partials('O_BR', 'Gamma', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
@@ -316,32 +335,15 @@ class Attitude_Roll(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
+        n = self.n
         Gamma = inputs['Gamma']
 
-        self.dO_dg = np.zeros((self.n, 3, 3))
-        self.dO_dg[:, 0, 0] = -np.sin(Gamma)
-        self.dO_dg[:, 0, 1] = np.cos(Gamma)
-        self.dO_dg[:, 1, 0] = -self.dO_dg[:, 0, 1]
-        self.dO_dg[:, 1, 1] = self.dO_dg[:, 0, 0]
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dO_BR = d_outputs['O_BR']
-
-        if mode == 'fwd':
-            if 'Gamma' in d_inputs:
-                for k in range(3):
-                    for j in range(3):
-                        dO_BR[:, k, j] += self.dO_dg[:, k, j] * \
-                            d_inputs['Gamma']
-        else:
-            if 'Gamma' in d_inputs:
-                for k in range(3):
-                    for j in range(3):
-                        d_inputs['Gamma'] += self.dO_dg[:, k, j] * \
-                            dO_BR[:, k, j]
+        sin_gam = np.sin(Gamma)
+        cos_gam = np.cos(Gamma)
+        partials['O_BR', 'Gamma'][:n] = -sin_gam
+        partials['O_BR', 'Gamma'][n:2*n] = cos_gam
+        partials['O_BR', 'Gamma'][2*n:3*n] = -cos_gam
+        partials['O_BR', 'Gamma'][3*n:4*n] = -sin_gam
 
 
 class Attitude_RotationMtx(ExplicitComponent):
@@ -372,6 +374,28 @@ class Attitude_RotationMtx(ExplicitComponent):
                         desc='Rotation matrix from body-fixed frame to '
                         'Earth-centered inertial frame over time')
 
+        row = np.repeat(np.arange(3), 3)
+        row1 = np.tile(row, n) + np.repeat(9*np.arange(n), 9)
+        col = np.tile(np.arange(3), 3)
+        col1 = np.tile(col, n) + np.repeat(9*np.arange(n), 9)
+
+        # Transpose here instead of in compute_partials
+        rows = np.concatenate([col1, col1+3, col1+6])
+        cols = np.concatenate([row1, row1+3, row1+6])
+
+        self.declare_partials('O_BI', 'O_BR', rows=rows, cols=cols)
+
+        row = np.repeat(3*np.arange(3), 3)
+        row1 = np.tile(row, n) + np.repeat(9*np.arange(n), 9)
+
+        col = np.tile(np.array([0, 3, 6]), 3)
+        col1 = np.tile(col, n) + np.repeat(9*np.arange(n), 9)
+
+        rows = np.concatenate([row1, row1+1, row1+2])
+        cols = np.concatenate([col1, col1+1, col1+2])
+
+        self.declare_partials('O_BI', 'O_RI', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -383,34 +407,24 @@ class Attitude_RotationMtx(ExplicitComponent):
         for i in range(0, self.n):
             O_BI[i, :, :] = np.dot(O_BR[i, :, :], O_RI[i, :, :])
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+    def compute_partials(self, inputs, partials):
         """
-        Matrix-vector product with the Jacobian.
+        Calculate and save derivatives. (i.e., Jacobian)
         """
-        dO_BI = d_outputs['O_BI']
+        n = self.n
         O_BR = inputs['O_BR']
         O_RI = inputs['O_RI']
 
-        if mode == 'fwd':
-            for u in range(3):
-                for v in range(3):
-                    for k in range(3):
-                        if 'O_RI' in d_inputs:
-                            dO_BI[:, u, v] += O_BR[:, u, k] * \
-                                d_inputs['O_RI'][:, k, v]
-                        if 'O_BR' in d_inputs:
-                            dO_BI[:, u, v] += d_inputs['O_BR'][:, u, k] * \
-                                O_RI[:, k, v]
-        else:
-            for u in range(3):
-                for v in range(3):
-                    for k in range(3):
-                        if 'O_RI' in d_inputs:
-                            d_inputs['O_RI'][:, k, v] += O_BR[:, u, k] * \
-                                dO_BI[:, u, v]
-                        if 'O_BR' in d_inputs:
-                            d_inputs['O_BR'][:, u, k] += dO_BI[:, u, v] * \
-                                O_RI[:, k, v]
+        nn = 9*n
+        dO_BR = O_RI.flatten()
+        partials['O_BI', 'O_BR'][:nn] = dO_BR
+        partials['O_BI', 'O_BR'][nn:2*nn] = dO_BR
+        partials['O_BI', 'O_BR'][2*nn:3*nn] = dO_BR
+
+        dO_RI = O_BR.flatten()
+        partials['O_BI', 'O_RI'][:nn] = dO_RI
+        partials['O_BI', 'O_RI'][nn:2*nn] = dO_RI
+        partials['O_BI', 'O_RI'][2*nn:3*nn] = dO_RI
 
 
 class Attitude_RotationMtxRates(ExplicitComponent):
@@ -435,6 +449,15 @@ class Attitude_RotationMtxRates(ExplicitComponent):
         # Outputs
         self.add_output('Odot_BI', np.zeros((n, 3, 3)), units=None,
                         desc='First derivative of O_BI over time')
+
+        base1 = np.arange(9)
+        base2 = np.arange(9*(n - 2))
+        nn = 9*(n - 1)
+
+        rows = np.concatenate([base1, base1, base2+9, base2+9, base1+nn, base1+nn])
+        cols = np.concatenate([base1+9, base1, base2+18, base2, base1+nn, base1+nn-9])
+
+        self.declare_partials('Odot_BI', 'O_BI', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
