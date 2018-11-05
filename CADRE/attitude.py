@@ -457,7 +457,7 @@ class Attitude_RotationMtxRates(ExplicitComponent):
         rows = np.concatenate([base1, base1, base2+9, base2+9, base1+nn, base1+nn])
         cols = np.concatenate([base1+9, base1, base2+18, base2, base1+nn, base1+nn-9])
 
-        self.declare_partials('Odot_BI', 'O_BI', rows=rows, cols=cols)
+        #self.declare_partials('Odot_BI', 'O_BI', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """

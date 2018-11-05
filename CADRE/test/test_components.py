@@ -93,7 +93,20 @@ class TestCADRE(unittest.TestCase):
 
         for var, meta in inputs:
             if var in setd:
-                prob[var] = setd[var]
+
+                # Pickle was recorded with different array order.
+                actual = setd[var]
+                nn = len(actual.shape)
+                if nn > 1 and actual.shape[-1] == 1500:
+                    zz = [nn-1]
+                    zz.extend(np.arange(nn-1))
+                    actual = np.transpose(actual, axes=zz)
+
+                # one changed shape since the old code
+                if var in ['SOC']:
+                    actual = actual.flatten()
+
+                prob[var] = actual
 
         comp.h = h  # some components need this
 
@@ -102,6 +115,15 @@ class TestCADRE(unittest.TestCase):
         for var, meta in outputs:
             if var in setd:
                 tval = setd[var]
+
+                # Pickle was recorded with different array order.
+                tval = setd[var]
+                nn = len(tval.shape)
+                if nn > 1 and tval.shape[-1] == 1500:
+                    zz = [nn-1]
+                    zz.extend(np.arange(nn-1))
+                    tval = np.transpose(tval, axes=zz)
+
                 assert(np.linalg.norm(tval - prob[var]) / np.linalg.norm(tval) < 1e-3), \
                     '%s: Expected\n%s\nbut got\n%s' % (var, str(tval), str(prob[var]))
 
