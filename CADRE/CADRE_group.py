@@ -102,7 +102,7 @@ class CADRE(Group):
 
         # Design parameters
         design = IndepVarComp()
-        design.add_output('CP_Isetpt', initial_inputs['CP_Isetpt'], units='A')
+        design.add_output('CP_Isetpt', initial_inputs['CP_Isetpt'].T, units='A')
         design.add_output('CP_gamma', initial_inputs['CP_gamma'], units='rad')
         design.add_output('CP_P_comm', initial_inputs['CP_P_comm'], units='W')
         design.add_output('iSOC', initial_inputs['iSOC'])

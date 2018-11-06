@@ -40,7 +40,7 @@ class BsplineParameters(ExplicitComponent):
         self.add_input('CP_gamma', np.zeros((m, )), units='rad',
                        desc='Satellite roll angle at control points')
 
-        self.add_input('CP_Isetpt', np.zeros((12, m)), units='A',
+        self.add_input('CP_Isetpt', np.zeros((m, 12)), units='A',
                        desc='Currents of the solar panels at the control points')
 
         # Outputs
@@ -52,6 +52,18 @@ class BsplineParameters(ExplicitComponent):
 
         self.add_output('Isetpt', 0.2*np.ones((n, 12)), units='A',
                         desc='Currents of the solar panels over time')
+
+        self.declare_partials('P_comm', 'CP_P_comm')
+        self.declare_partials('Gamma', 'CP_gamma')
+
+        rowm = np.repeat(0, m)
+        colm = 12*np.arange(m)
+        rown = np.tile(rowm, n) + np.repeat(12*np.arange(n), m)
+        coln = np.tile(colm, n)
+        rows = np.tile(rown, 12) + np.repeat(np.arange(12), n*m)
+        cols = np.tile(coln, 12) + np.repeat(np.arange(12), n*m)
+
+        self.declare_partials('Isetpt', 'CP_Isetpt', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
@@ -74,29 +86,17 @@ class BsplineParameters(ExplicitComponent):
         outputs['P_comm'] = self.B.dot(inputs['CP_P_comm'])
         outputs['Gamma'] = self.B.dot(inputs['CP_gamma'])
         for k in range(12):
-            outputs['Isetpt'][:, k] = self.B.dot(inputs['CP_Isetpt'][k, :])
+            outputs['Isetpt'][:, k] = self.B.dot(inputs['CP_Isetpt'][:, k])
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+    def compute_partials(self, inputs, partials):
         """
-        Matrix-vector product with the Jacobian.
+        Calculate and save derivatives. (i.e., Jacobian)
         """
-        if mode == 'fwd':
-            if 'P_comm' in d_outputs and 'CP_P_comm' in d_inputs:
-                d_outputs['P_comm'] += self.B.dot(d_inputs['CP_P_comm'])
+        B = self.B
+        partials['P_comm', 'CP_P_comm'] = B
+        partials['Gamma', 'CP_gamma'] = B
 
-            if 'Gamma' in d_outputs and 'CP_gamma' in d_inputs:
-                d_outputs['Gamma'] += self.B.dot(d_inputs['CP_gamma'])
+        # TODO : need to fix the time issue so that we can declare very sparse derivatives.
+        partials['Isetpt', 'CP_Isetpt'] = np.tile(B.todense().flat, 12)
 
-            if 'Isetpt' in d_outputs and 'CP_Isetpt' in d_inputs:
-                for k in range(12):
-                    d_outputs['Isetpt'][:, k] += self.B.dot(d_inputs['CP_Isetpt'][k, :])
-        else:
-            if 'P_comm' in d_outputs and 'CP_P_comm' in d_inputs:
-                d_inputs['CP_P_comm'] += self.BT.dot(d_outputs['P_comm'])
 
-            if 'Gamma' in d_outputs and 'CP_gamma' in d_inputs:
-                d_inputs['CP_gamma'] += self.BT.dot(d_outputs['Gamma'])
-
-            if 'Isetpt' in d_outputs and 'CP_Isetpt' in d_inputs:
-                for k in range(12):
-                    d_inputs['CP_Isetpt'][k, :] += self.BT.dot(d_outputs['Isetpt'][:, k])

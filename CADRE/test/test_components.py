@@ -97,7 +97,7 @@ class TestCADRE(unittest.TestCase):
                 # Pickle was recorded with different array order.
                 actual = setd[var]
                 nn = len(actual.shape)
-                if nn > 1 and actual.shape[-1] == 1500:
+                if nn > 1 and (actual.shape[-1] == 1500 or actual.shape[-1] == 300):
                     zz = [nn-1]
                     zz.extend(np.arange(nn-1))
                     actual = np.transpose(actual, axes=zz)
@@ -119,7 +119,7 @@ class TestCADRE(unittest.TestCase):
                 # Pickle was recorded with different array order.
                 tval = setd[var]
                 nn = len(tval.shape)
-                if nn > 1 and tval.shape[-1] == 1500:
+                if nn > 1 and (tval.shape[-1] == 1500 or tval.shape[-1] == 300):
                     zz = [nn-1]
                     zz.extend(np.arange(nn-1))
                     tval = np.transpose(tval, axes=zz)

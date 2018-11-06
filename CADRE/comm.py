@@ -81,7 +81,7 @@ class Comm_AntRotation(ExplicitComponent):
         self.add_output('q_A', np.zeros((n, 4)), units=None,
                         desc='Quarternion matrix in antenna angle frame over time')
 
-        self.dq_dt = np.zeros(4)
+        self.declare_partials('q_A', 'antAngle')
 
     def compute(self, inputs, outputs):
         """
@@ -101,27 +101,17 @@ class Comm_AntRotation(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-
+        n = self.n
         antAngle = inputs['antAngle']
+        dq_dt = np.zeros(4)
 
         rt2 = np.sqrt(2)
-        self.dq_dt[0] = - np.sin(antAngle / 2.) / 2.
-        self.dq_dt[1] = np.cos(antAngle / 2.) / rt2 / 2.
-        self.dq_dt[2] = - np.cos(antAngle / 2.) / rt2 / 2.
-        self.dq_dt[3] = 0.0
+        dq_dt[0] = - np.sin(antAngle / 2.) / 2.
+        dq_dt[1] = np.cos(antAngle / 2.) / rt2 / 2.
+        dq_dt[2] = - np.cos(antAngle / 2.) / rt2 / 2.
+        dq_dt[3] = 0.0
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        if mode == 'fwd':
-            if 'antAngle' in d_inputs:
-                for k in range(4):
-                    d_outputs['q_A'][:, k] += self.dq_dt[k] * d_inputs['antAngle']
-        else:
-            if 'antAngle' in d_inputs:
-                for k in range(4):
-                    d_inputs['antAngle'] += self.dq_dt[k] * np.sum(d_outputs['q_A'][:, k])
+        partials['q_A', 'antAngle'] = np.tile(dq_dt, n)
 
 
 class Comm_AntRotationMtx(ExplicitComponent):

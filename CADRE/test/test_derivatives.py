@@ -190,35 +190,35 @@ class TestCADRE(unittest.TestCase):
         #self.prob.run_model()
         #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_BatteryConstraints(self):
-        compname = 'BatteryConstraints'
-        inputs = ['I_bat', 'SOC']
-        outputs = ['ConCh', 'ConDs', 'ConS0', 'ConS1']
-        state0 = []
+    #def test_BatteryConstraints(self):
+        #compname = 'BatteryConstraints'
+        #inputs = ['I_bat', 'SOC']
+        #outputs = ['ConCh', 'ConDs', 'ConS0', 'ConS1']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_BsplineParameters(self):
-        compname = 'BsplineParameters'
-        inputs = ['CP_P_comm', 'CP_gamma', 'CP_Isetpt']
-        outputs = ['P_comm', 'Gamma', 'Isetpt']
-        state0 = []
+    #def test_BsplineParameters(self):
+        #compname = 'BsplineParameters'
+        #inputs = ['CP_P_comm', 'CP_gamma', 'CP_Isetpt']
+        #outputs = ['P_comm', 'Gamma', 'Isetpt']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_DataDownloaded(self):
-        compname = 'Comm_DataDownloaded'
-        inputs = ['Dr']
-        outputs = ['Data']
-        state0 = ['Data0']
+    #def test_Comm_DataDownloaded(self):
+        #compname = 'Comm_DataDownloaded'
+        #inputs = ['Dr']
+        #outputs = ['Data']
+        #state0 = ['Data0']
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
     def test_Comm_AntRotation(self):
         compname = 'Comm_AntRotation'
