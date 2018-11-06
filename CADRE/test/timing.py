@@ -5,6 +5,8 @@ from __future__ import print_function
 
 import time
 
+import numpy as np
+
 from openmdao.api import Problem
 
 from CADRE.CADRE_group import CADRE
@@ -41,7 +43,16 @@ input_data = [
     'iSOC'
 ]
 for inp in input_data:
-    prob[inp] = setd[inp]
+    actual = setd[inp]
+
+    # Pickle was recorded with different array order.
+    nn = len(actual.shape)
+    if nn > 1 and (actual.shape[-1] == 1500 or actual.shape[-1] == 300):
+        zz = [nn-1]
+        zz.extend(np.arange(nn-1))
+        actual = np.transpose(actual, axes=zz)
+
+    prob[inp] = actual
 
 # run model
 t0 = time.time()
