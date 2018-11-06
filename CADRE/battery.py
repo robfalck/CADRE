@@ -147,6 +147,14 @@ class BatteryPower(ExplicitComponent):
         self.add_output('I_bat', np.zeros((n, )), units='A',
                         desc='Battery Current over time')
 
+        row_col = np.arange(n)
+
+        self.declare_partials('I_bat', 'SOC', rows=row_col, cols=row_col)
+        self.declare_partials('I_bat', 'P_bat', rows=row_col, cols=row_col)
+
+        col = 5*row_col + 4
+        self.declare_partials('I_bat', 'temperature', rows=row_col, cols=col)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -174,36 +182,11 @@ class BatteryPower(ExplicitComponent):
         dV_dT = - IR * self.voc * np.exp(alpha*(temperature[:, 4] - T0)/T0) * alpha / T0
         dVoc_dSOC = np.exp(SOC) / (np.e-1)
 
-        self.dI_dP = 1.0 / self.V
+        partials['I_bat', 'P_bat'] = 1.0 / self.V
+
         tmp = -P_bat/(self.V**2)
-        self.dI_dT = tmp * dV_dT
-        self.dI_dSOC = tmp * dV_dvoc * dVoc_dSOC
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-
-        dI_bat = d_outputs['I_bat']
-
-        if mode == 'fwd':
-            if 'P_bat' in d_inputs:
-                dI_bat += self.dI_dP * d_inputs['P_bat']
-
-            if 'temperature' in d_inputs:
-                dI_bat += self.dI_dT * d_inputs['temperature'][:, 4]
-
-            if 'SOC' in d_inputs:
-                dI_bat += self.dI_dSOC * d_inputs['SOC']
-        else:
-            if 'P_bat' in d_inputs:
-                d_inputs['P_bat'] += self.dI_dP * dI_bat
-
-            if 'temperature' in d_inputs:
-                d_inputs['temperature'][:, 4] += self.dI_dT * dI_bat
-
-            if 'SOC' in d_inputs:
-                d_inputs['SOC'] += self.dI_dSOC * dI_bat
+        partials['I_bat', 'temperature'] = tmp * dV_dT
+        partials['I_bat', 'SOC'] = tmp * dV_dvoc * dVoc_dSOC
 
 
 class BatteryConstraints(ExplicitComponent):
@@ -250,6 +233,11 @@ class BatteryConstraints(ExplicitComponent):
         self.add_output('ConS1', 0.0, units=None,
                         desc='Constraint on maximum state of charge')
 
+        self.declare_partials('ConCh', 'I_bat')
+        self.declare_partials('ConDs', 'I_bat')
+        self.declare_partials('ConS0', 'SOC')
+        self.declare_partials('ConS1', 'SOC')
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -266,38 +254,12 @@ class BatteryConstraints(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        self.dCh_dg, self.dCh_drho = self.KS_ch.derivatives()
-        self.dDs_dg, self.dDs_drho = self.KS_ds.derivatives()
-        self.dS0_dg, self.dS0_drho = self.KS_s0.derivatives()
-        self.dS1_dg, self.dS1_drho = self.KS_s1.derivatives()
+        dCh_dg, _ = self.KS_ch.derivatives()
+        dDs_dg, _ = self.KS_ds.derivatives()
+        dS0_dg, _ = self.KS_s0.derivatives()
+        dS1_dg, _ = self.KS_s1.derivatives()
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-         Matrix-vector product with the Jacobian.
-         """
-        if mode == 'fwd':
-            if 'I_bat' in d_inputs:
-                if 'ConCh' in d_outputs:
-                    d_outputs['ConCh'] += np.dot(self.dCh_dg, d_inputs['I_bat'])
-                if 'ConDs' in d_outputs:
-                    d_outputs['ConDs'] -= np.dot(self.dDs_dg, d_inputs['I_bat'])
-            if 'SOC' in d_inputs:
-                if 'ConS0' in d_outputs:
-                    d_outputs['ConS0'] -= np.dot(self.dS0_dg, d_inputs['SOC'])
-                if 'ConS1' in d_outputs:
-                    d_outputs['ConS1'] += np.dot(self.dS1_dg, d_inputs['SOC'])
-        else:
-            if 'I_bat' in d_inputs:
-                dI_bat = d_inputs['I_bat']
-                if 'ConCh' in d_outputs:
-                    dI_bat += self.dCh_dg * d_outputs['ConCh']
-                if 'ConDs' in d_outputs:
-                    dI_bat -= self.dDs_dg * d_outputs['ConDs']
-                d_inputs['I_bat'] = dI_bat
-            if 'SOC' in d_inputs:
-                dSOC = d_inputs['SOC']
-                if 'ConS0' in d_outputs:
-                    dSOC -= self.dS0_dg * d_outputs['ConS0']
-                if 'ConS1' in d_outputs:
-                    dSOC += self.dS1_dg * d_outputs['ConS1']
-                d_inputs['SOC'] = dSOC
+        partials['ConCh', 'I_bat'] = dCh_dg
+        partials['ConDs', 'I_bat'] = -dDs_dg
+        partials['ConS0', 'SOC'] = -dS0_dg
+        partials['ConS1', 'SOC'] = dS1_dg

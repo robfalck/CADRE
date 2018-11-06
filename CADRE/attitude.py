@@ -638,28 +638,3 @@ class Attitude_Torque(ExplicitComponent):
 
         partials['T_tot', 'w_B'] = dT_dw.flatten()
         partials['T_tot', 'wdot_B'] = dT_dwdot.flatten()
-
-    #def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        #"""
-        #Matrix-vector product with the Jacobian.
-        #"""
-        #dT_tot = d_outputs['T_tot']
-
-        #if mode == 'fwd':
-            #for k in range(3):
-                #for j in range(3):
-                    #if 'w_B' in d_inputs:
-                        #dT_tot[:, k] += self.dT_dw[:, k, j] * \
-                            #d_inputs['w_B'][:, j]
-                    #if 'wdot_B' in d_inputs:
-                        #dT_tot[:, k] += self.dT_dwdot[:, k, j] * \
-                            #d_inputs['wdot_B'][:, j]
-        #else:
-            #for k in range(3):
-                #for j in range(3):
-                    #if 'w_B' in d_inputs:
-                        #d_inputs['w_B'][:, j] += self.dT_dw[:, k, j] * \
-                            #dT_tot[:, k]
-                    #if 'wdot_B' in d_inputs:
-                        #d_inputs['wdot_B'][:, j] += self.dT_dwdot[:, k, j] * \
-                            #dT_tot[:, k]

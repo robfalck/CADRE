@@ -89,106 +89,106 @@ class TestCADRE(unittest.TestCase):
         # Only check relative
         assert_check_partials(partials, atol=np.inf, rtol=5e-3)
 
-    def test_Attitude_Angular(self):
-        compname = 'Attitude_Angular'
-        inputs = ['O_BI', 'Odot_BI']
-        outputs = ['w_B']
-        state0 = []
+    #def test_Attitude_Angular(self):
+        #compname = 'Attitude_Angular'
+        #inputs = ['O_BI', 'Odot_BI']
+        #outputs = ['w_B']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Attitude_AngularRates(self):
-        compname = 'Attitude_AngularRates'
-        inputs = ['w_B']
-        outputs = ['wdot_B']
-        state0 = []
+    #def test_Attitude_AngularRates(self):
+        #compname = 'Attitude_AngularRates'
+        #inputs = ['w_B']
+        #outputs = ['wdot_B']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Attitude_Attitude(self):
-        compname = 'Attitude_Attitude'
-        inputs = ['r_e2b_I']
-        outputs = ['O_RI']
-        state0 = []
+    #def test_Attitude_Attitude(self):
+        #compname = 'Attitude_Attitude'
+        #inputs = ['r_e2b_I']
+        #outputs = ['O_RI']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Attitude_Roll(self):
-        compname = 'Attitude_Roll'
-        inputs = ['Gamma']
-        outputs = ['O_BR']
-        state0 = []
+    #def test_Attitude_Roll(self):
+        #compname = 'Attitude_Roll'
+        #inputs = ['Gamma']
+        #outputs = ['O_BR']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Attitude_RotationMtx(self):
-        compname = 'Attitude_RotationMtx'
-        inputs = ['O_BR', 'O_RI']
-        outputs = ['O_BI']
-        state0 = []
+    #def test_Attitude_RotationMtx(self):
+        #compname = 'Attitude_RotationMtx'
+        #inputs = ['O_BR', 'O_RI']
+        #outputs = ['O_BI']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Attitude_RotationMtxRates(self):
-        compname = 'Attitude_RotationMtxRates'
-        inputs = ['O_BI']
-        outputs = ['Odot_BI']
-        state0 = []
+    #def test_Attitude_RotationMtxRates(self):
+        #compname = 'Attitude_RotationMtxRates'
+        #inputs = ['O_BI']
+        #outputs = ['Odot_BI']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Attitude_Sideslip(self):
-        compname = 'Attitude_Sideslip'
-        inputs = ['r_e2b_I', 'O_BI']
-        outputs = ['v_e2b_B']
-        state0 = []
+    #def test_Attitude_Sideslip(self):
+        #compname = 'Attitude_Sideslip'
+        #inputs = ['r_e2b_I', 'O_BI']
+        #outputs = ['v_e2b_B']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Attitude_Torque(self):
-        compname = 'Attitude_Torque'
-        inputs = ['w_B', 'wdot_B']
-        outputs = ['T_tot']
-        state0 = []
+    #def test_Attitude_Torque(self):
+        #compname = 'Attitude_Torque'
+        #inputs = ['w_B', 'wdot_B']
+        #outputs = ['T_tot']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_BatterySOC(self):
-        compname = 'BatterySOC'
-        inputs = ['P_bat', 'temperature']
-        outputs = ['SOC']
-        state0 = ['iSOC']
+    #def test_BatterySOC(self):
+        #compname = 'BatterySOC'
+        #inputs = ['P_bat', 'temperature']
+        #outputs = ['SOC']
+        #state0 = ['iSOC']
 
-        self.setup(compname, inputs, state0)
-        self.prob.model.comp.h = 0.01
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.model.comp.h = 0.01
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_BatteryPower(self):
-        compname = 'BatteryPower'
-        inputs = ['SOC', 'temperature', 'P_bat']
-        outputs = ['I_bat']
-        state0 = []
+    #def test_BatteryPower(self):
+        #compname = 'BatteryPower'
+        #inputs = ['SOC', 'temperature', 'P_bat']
+        #outputs = ['I_bat']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
     def test_BatteryConstraints(self):
         compname = 'BatteryConstraints'
