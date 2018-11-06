@@ -412,16 +412,16 @@ class Attitude_RotationMtx(ExplicitComponent):
         Calculate and save derivatives. (i.e., Jacobian)
         """
         n = self.n
-        O_BR = inputs['O_BR']
-        O_RI = inputs['O_RI']
+        O_BR = inputs['O_BR'].flatten()
+        O_RI = inputs['O_RI'].flatten()
 
         nn = 9*n
-        dO_BR = O_RI.flatten()
+        dO_BR = O_RI
         partials['O_BI', 'O_BR'][:nn] = dO_BR
         partials['O_BI', 'O_BR'][nn:2*nn] = dO_BR
         partials['O_BI', 'O_BR'][2*nn:3*nn] = dO_BR
 
-        dO_RI = O_BR.flatten()
+        dO_RI = O_BR
         partials['O_BI', 'O_RI'][:nn] = dO_RI
         partials['O_BI', 'O_RI'][nn:2*nn] = dO_RI
         partials['O_BI', 'O_RI'][2*nn:3*nn] = dO_RI
@@ -440,6 +440,7 @@ class Attitude_RotationMtxRates(ExplicitComponent):
 
     def setup(self):
         n = self.n
+        h = self.h
 
         # Inputs
         self.add_input('O_BI', np.zeros((n, 3, 3)), units=None,
@@ -452,12 +453,15 @@ class Attitude_RotationMtxRates(ExplicitComponent):
 
         base1 = np.arange(9)
         base2 = np.arange(9*(n - 2))
+        val1 = np.ones((9, )) / h
+        val2 = np.ones((9*(n - 2), )) / (2.0 * h)
         nn = 9*(n - 1)
 
         rows = np.concatenate([base1, base1, base2+9, base2+9, base1+nn, base1+nn])
         cols = np.concatenate([base1+9, base1, base2+18, base2, base1+nn, base1+nn-9])
+        vals = np.concatenate([val1, -val1, val2, -val2, val1, -val1])
 
-        #self.declare_partials('Odot_BI', 'O_BI', rows=rows, cols=cols)
+        self.declare_partials('Odot_BI', 'O_BI', rows=rows, cols=cols, val=vals)
 
     def compute(self, inputs, outputs):
         """
@@ -474,34 +478,6 @@ class Attitude_RotationMtxRates(ExplicitComponent):
         Odot_BI[-1, :, :] = O_BI[-1, :, :]
         Odot_BI[-1, :, :] -= O_BI[-2, :, :]
         Odot_BI *= 1.0/h
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dOdot_BI = d_outputs['Odot_BI']
-
-        h = self.h
-
-        if mode == 'fwd':
-            if 'O_BI' in d_inputs:
-                dO_BI = d_inputs['O_BI']
-                dOdot_BI[0, :, :] += dO_BI[1, :, :] / h
-                dOdot_BI[0, :, :] -= dO_BI[0, :, :] / h
-                dOdot_BI[1:-1, :, :] += dO_BI[2:, :, :] / (2.0*h)
-                dOdot_BI[1:-1, :, :] -= dO_BI[:-2, :, :] / (2.0*h)
-                dOdot_BI[-1, :, :] += dO_BI[-1, :, :] / h
-                dOdot_BI[-1, :, :] -= dO_BI[-2, :, :] / h
-        else:
-            if 'O_BI' in d_inputs:
-                dO_BI = np.zeros(d_inputs['O_BI'].shape)
-                dO_BI[1, :, :] += dOdot_BI[0, :, :] / h
-                dO_BI[0, :, :] -= dOdot_BI[0, :, :] / h
-                dO_BI[2:, :, :] += dOdot_BI[1:-1, :, :] / (2.0*h)
-                dO_BI[:-2, :, :] -= dOdot_BI[1:-1, :, :] / (2.0*h)
-                dO_BI[-1, :, :] += dOdot_BI[-1, :, :] / h
-                dO_BI[-2, :, :] -= dOdot_BI[-1, :, :] / h
-                d_inputs['O_BI'] += dO_BI
 
 
 class Attitude_Sideslip(ExplicitComponent):
@@ -531,6 +507,21 @@ class Attitude_Sideslip(ExplicitComponent):
                         desc='Velocity vector from earth to satellite'
                         'in body-fixed frame over time')
 
+        row = np.tile(np.array([0]), 9) + np.repeat(np.arange(3), 3)
+        rows = np.tile(row, n) + np.repeat(3*np.arange(n), 9)
+        col = np.tile(np.array([3, 4, 5]), 3)
+        cols = np.tile(col, n) + np.repeat(6*np.arange(n), 9)
+
+        self.declare_partials('v_e2b_B', 'r_e2b_I', rows=rows, cols=cols)
+
+        row = np.tile(np.array([0, 0, 0]), n) + np.repeat(3*np.arange(n), 3)
+        col = np.tile(np.arange(3), n) + np.repeat(9*np.arange(n), 3)
+
+        rows = np.concatenate([row, row+1, row+2])
+        cols = np.concatenate([col, col+3, col+6])
+
+        self.declare_partials('v_e2b_B', 'O_BI', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -539,48 +530,23 @@ class Attitude_Sideslip(ExplicitComponent):
         O_BI = inputs['O_BI']
         v_e2b_B = outputs['v_e2b_B']
 
-        v_e2b_B[:] = computepositionrotd(self.n, r_e2b_I[:, 3:], O_BI)
+        v_e2b_B[:] = np.einsum('kij,kj->ki', O_BI, r_e2b_I[:, 3:])
 
     def compute_partials(self, inputs, partials):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        r_e2b_I = inputs['r_e2b_I']
+        n = self.n
+        r_e2b_I = inputs['r_e2b_I'][:, 3:]
         O_BI = inputs['O_BI']
 
-        self.J1, self.J2 = computepositionrotdjacobian(self.n,
-                                                       r_e2b_I[:, 3:],
-                                                       O_BI)
+        partials['v_e2b_B', 'r_e2b_I'] = O_BI.flatten()
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dv_e2b_B = d_outputs['v_e2b_B']
-
-        if mode == 'fwd':
-            for k in range(3):
-                if 'O_BI' in inputs:
-                    for u in range(3):
-                        for v in range(3):
-                            dv_e2b_B[:, k] += self.J1[:, k, u, v] * \
-                                d_inputs['O_BI'][:, u, v]
-                if 'r_e2b_I' in inputs:
-                    for j in range(3):
-                        dv_e2b_B[:, k] += self.J2[:, k, j] * \
-                            d_inputs['r_e2b_I'][:, 3+j]
-
-        else:
-            for k in range(3):
-                if 'O_BI' in inputs:
-                    for u in range(3):
-                        for v in range(3):
-                            d_inputs['O_BI'][:, u, v] += self.J1[:, k, u, v] * \
-                                dv_e2b_B[:, k]
-                if 'r_e2b_I' in inputs:
-                    for j in range(3):
-                        d_inputs['r_e2b_I'][:, 3+j] += self.J2[:, k, j] * \
-                            dv_e2b_B[:, k]
+        nn = 3*n
+        dO_BI = r_e2b_I.flatten()
+        partials['v_e2b_B', 'O_BI'][:nn] = dO_BI
+        partials['v_e2b_B', 'O_BI'][nn:2*nn] = dO_BI
+        partials['v_e2b_B', 'O_BI'][2*nn:3*nn] = dO_BI
 
 
 class Attitude_Torque(ExplicitComponent):
@@ -598,7 +564,6 @@ class Attitude_Torque(ExplicitComponent):
 
         self.n = n
 
-        self.dT_dwdot = np.zeros((n, 3, 3))
         self.dwx_dw = np.zeros((3, 3, 3))
 
         self.dwx_dw[0, :, 0] = (0., 0., 0.)
@@ -627,6 +592,13 @@ class Attitude_Torque(ExplicitComponent):
         self.add_output('T_tot', np.zeros((n, 3)), units='N*m',
                         desc='Total reaction wheel torque over time')
 
+        rows = np.tile(np.array([0, 0, 0]), 3*n) + np.repeat(np.arange(3*n), 3)
+        col = np.tile(np.array([0, 1, 2]), 3)
+        cols = np.tile(col, n) + np.repeat(3*np.arange(n), 9)
+
+        self.declare_partials('T_tot', 'w_B', rows=rows, cols=cols)
+        self.declare_partials('T_tot', 'wdot_B', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -649,7 +621,8 @@ class Attitude_Torque(ExplicitComponent):
         """
         w_B = inputs['w_B']
 
-        self.dT_dw = np.zeros((self.n, 3, 3))
+        dT_dw = np.zeros((self.n, 3, 3))
+        dT_dwdot = np.zeros((self.n, 3, 3))
         wx = np.zeros((3, 3))
 
         for i in range(0, self.n):
@@ -657,34 +630,36 @@ class Attitude_Torque(ExplicitComponent):
             wx[1, :] = (w_B[i, 2], 0., -w_B[i, 0])
             wx[2, :] = (-w_B[i, 1], w_B[i, 0], 0.)
 
-            self.dT_dwdot[i, :, :] = self.J
-            self.dT_dw[i, :, :] = np.dot(wx, self.J)
+            dT_dwdot[i, :, :] = self.J
+            dT_dw[i, :, :] = np.dot(wx, self.J)
 
             for k in range(0, 3):
-                self.dT_dw[i, :, k] += np.dot(self.dwx_dw[:, :, k],
-                                              np.dot(self.J, w_B[i, :]))
+                dT_dw[i, :, k] += np.dot(self.dwx_dw[:, :, k], np.dot(self.J, w_B[i, :]))
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dT_tot = d_outputs['T_tot']
+        partials['T_tot', 'w_B'] = dT_dw.flatten()
+        partials['T_tot', 'wdot_B'] = dT_dwdot.flatten()
 
-        if mode == 'fwd':
-            for k in range(3):
-                for j in range(3):
-                    if 'w_B' in d_inputs:
-                        dT_tot[:, k] += self.dT_dw[:, k, j] * \
-                            d_inputs['w_B'][:, j]
-                    if 'wdot_B' in d_inputs:
-                        dT_tot[:, k] += self.dT_dwdot[:, k, j] * \
-                            d_inputs['wdot_B'][:, j]
-        else:
-            for k in range(3):
-                for j in range(3):
-                    if 'w_B' in d_inputs:
-                        d_inputs['w_B'][:, j] += self.dT_dw[:, k, j] * \
-                            dT_tot[:, k]
-                    if 'wdot_B' in d_inputs:
-                        d_inputs['wdot_B'][:, j] += self.dT_dwdot[:, k, j] * \
-                            dT_tot[:, k]
+    #def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        #"""
+        #Matrix-vector product with the Jacobian.
+        #"""
+        #dT_tot = d_outputs['T_tot']
+
+        #if mode == 'fwd':
+            #for k in range(3):
+                #for j in range(3):
+                    #if 'w_B' in d_inputs:
+                        #dT_tot[:, k] += self.dT_dw[:, k, j] * \
+                            #d_inputs['w_B'][:, j]
+                    #if 'wdot_B' in d_inputs:
+                        #dT_tot[:, k] += self.dT_dwdot[:, k, j] * \
+                            #d_inputs['wdot_B'][:, j]
+        #else:
+            #for k in range(3):
+                #for j in range(3):
+                    #if 'w_B' in d_inputs:
+                        #d_inputs['w_B'][:, j] += self.dT_dw[:, k, j] * \
+                            #dT_tot[:, k]
+                    #if 'wdot_B' in d_inputs:
+                        #d_inputs['wdot_B'][:, j] += self.dT_dwdot[:, k, j] * \
+                            #dT_tot[:, k]
