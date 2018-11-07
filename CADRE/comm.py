@@ -136,7 +136,12 @@ class Comm_AntRotationMtx(ExplicitComponent):
                         desc='Rotation matrix from antenna angle to body-fixed '
                              'frame over time')
 
-        self.J = np.empty((n, 3, 3, 4))
+        row = np.tile(np.array([0, 0, 0, 0]), 9) + np.repeat(np.arange(9), 4)
+        col = np.tile(np.arange(4), 9)
+        rows = np.tile(row, n) + np.repeat(9*np.arange(n), 36)
+        cols = np.tile(col, n) + np.repeat(4*np.arange(n), 36)
+
+        self.declare_partials('O_AB', 'q_A', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
@@ -165,6 +170,8 @@ class Comm_AntRotationMtx(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
+        n = self.n
+        J = np.empty((n, 3, 3, 4))
         q_A = inputs['q_A']
 
         A = np.zeros((4, 3))
@@ -226,29 +233,9 @@ class Comm_AntRotationMtx(ExplicitComponent):
             B[3, :] = ( q_A[i, 1],  q_A[i, 2],  q_A[i, 3])  # noqa: E201
 
             for k in range(0, 4):
-                self.J[i, :, :, k] = np.dot(dA_dq[:, :, k].T, B) + \
-                    np.dot(A.T, dB_dq[:, :, k])
+                J[i, :, :, k] = np.dot(dA_dq[:, :, k].T, B) + np.dot(A.T, dB_dq[:, :, k])
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        if 'q_A' in d_inputs:
-            dq_A = d_inputs['q_A']
-            dO_AB = d_outputs['O_AB']
-
-            if mode == 'fwd':
-                for u in range(3):
-                    for v in range(3):
-                        for k in range(4):
-                            dO_AB[:, u, v] += \
-                                self.J[:, u, v, k] * dq_A[:, k]
-            else:
-                for u in range(3):
-                    for v in range(3):
-                        for k in range(4):
-                            dq_A[:, k] += self.J[:, u, v, k] * \
-                                dO_AB[:, u, v]
+        partials['O_AB', 'q_A'] = J.flatten()
 
 
 class Comm_BitRate(ExplicitComponent):
@@ -291,6 +278,13 @@ class Comm_BitRate(ExplicitComponent):
         self.add_output('Dr', np.zeros(n), units='Gibyte/s',
                         desc='Download rate over time')
 
+        row_col = np.arange(n)
+
+        self.declare_partials('Dr', 'P_comm', rows=row_col, cols=row_col)
+        self.declare_partials('Dr', 'gain', rows=row_col, cols=row_col)
+        self.declare_partials('Dr', 'GSdist', rows=row_col, cols=row_col)
+        self.declare_partials('Dr', 'CommLOS', rows=row_col, cols=row_col)
+
     def compute(self, inputs, outputs):
         """
          Calculate outputs.
@@ -306,64 +300,31 @@ class Comm_BitRate(ExplicitComponent):
                 S2 = GSdist[i] * 1e3
             else:
                 S2 = 1e-10
-            Dr[i] = self.alpha * P_comm[i] * gain[i] * \
-                CommLOS[i] / S2 ** 2
+            Dr[i] = self.alpha * P_comm[i] * gain[i] * CommLOS[i] / S2 ** 2
 
     def compute_partials(self, inputs, partials):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
+        n = self.n
         P_comm = inputs['P_comm']
         gain = inputs['gain']
         GSdist = inputs['GSdist']
         CommLOS = inputs['CommLOS']
 
-        S2 = 0.0
-        self.dD_dP = np.zeros(self.n)
-        self.dD_dGt = np.zeros(self.n)
-        self.dD_dS = np.zeros(self.n)
-        self.dD_dLOS = np.zeros(self.n)
+        S2 = np.zeros(n)
 
-        for i in range(0, self.n):
-
+        for i in range(n):
             if np.abs(GSdist[i]) > 1e-10:
-                S2 = GSdist[i] * 1e3
+                S2[i] = GSdist[i] * 1e3
             else:
-                S2 = 1e-10
+                S2[i] = 1e-10
 
-            self.dD_dP[i] = self.alpha * gain[i] * \
-                CommLOS[i] / S2 ** 2
-            self.dD_dGt[i] = self.alpha * P_comm[i] * \
-                CommLOS[i] / S2 ** 2
-            self.dD_dS[i] = -2.0 * 1e3 * self.alpha * P_comm[i] * \
-                gain[i] * CommLOS[i] / S2 ** 3
-            self.dD_dLOS[i] = self.alpha * \
-                P_comm[i] * gain[i] / S2 ** 2
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dDr = d_outputs['Dr']
-
-        if mode == 'fwd':
-            if 'P_comm' in d_inputs:
-                dDr += self.dD_dP * d_inputs['P_comm']
-            if 'gain' in d_inputs:
-                dDr += self.dD_dGt * d_inputs['gain']
-            if 'GSdist' in d_inputs:
-                dDr += self.dD_dS * d_inputs['GSdist']
-            if 'CommLOS' in d_inputs:
-                dDr += self.dD_dLOS * d_inputs['CommLOS']
-        else:
-            if 'P_comm' in d_inputs:
-                d_inputs['P_comm'] += self.dD_dP.T * dDr
-            if 'gain' in d_inputs:
-                d_inputs['gain'] += self.dD_dGt.T * dDr
-            if 'GSdist' in d_inputs:
-                d_inputs['GSdist'] += self.dD_dS.T * dDr
-            if 'CommLOS' in d_inputs:
-                d_inputs['CommLOS'] += self.dD_dLOS.T * dDr
+        rec_S2_sq = 1.0 / S2 ** 2
+        partials['Dr', 'P_comm'] = self.alpha * gain * CommLOS * rec_S2_sq
+        partials['Dr', 'gain'] = self.alpha * P_comm * CommLOS * rec_S2_sq
+        partials['Dr', 'GSdist'] = -2.0 * 1e3 * self.alpha * P_comm * gain * CommLOS * rec_S2_sq / S2
+        partials['Dr', 'CommLOS'] = self.alpha * P_comm * gain * rec_S2_sq
 
 
 class Comm_Distance(ExplicitComponent):
@@ -388,6 +349,11 @@ class Comm_Distance(ExplicitComponent):
         self.add_output('GSdist', np.zeros(n), units='km',
                         desc='Distance from ground station to satellite over time')
 
+        rows = np.tile(np.array([0, 0, 0]), n) + np.repeat(np.arange(n), 3)
+        cols = np.tile(np.arange(3), n) + np.repeat(3*np.arange(n), 3)
+
+        self.declare_partials('GSdist', 'r_b2g_A', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -404,26 +370,13 @@ class Comm_Distance(ExplicitComponent):
         """
         r_b2g_A = inputs['r_b2g_A']
 
-        self.J = np.zeros((self.n, 3))
+        J = np.zeros((self.n, 3))
         for i in range(0, self.n):
             norm = np.dot(r_b2g_A[i, :], r_b2g_A[i, :])**0.5
             if norm > 1e-10:
-                self.J[i, :] = r_b2g_A[i, :] / norm
-            else:
-                self.J[i, :] = 0.
+                J[i, :] = r_b2g_A[i, :] / norm
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        if mode == 'fwd':
-            if 'r_b2g_A' in d_inputs:
-                for k in range(3):
-                    d_outputs['GSdist'] += self.J[:, k] * d_inputs['r_b2g_A'][:, k]
-        else:
-            if 'r_b2g_A' in d_inputs:
-                for k in range(3):
-                    d_inputs['r_b2g_A'][:, k] += self.J[:, k] * d_outputs['GSdist']
+        partials['GSdist', 'r_b2g_A'] = J.flatten()
 
 
 class Comm_EarthsSpin(ExplicitComponent):
@@ -447,6 +400,13 @@ class Comm_EarthsSpin(ExplicitComponent):
         self.add_output('q_E', np.zeros((n, 4)), units=None,
                         desc='Quarternion matrix in Earth-fixed frame over time')
 
+        row = 4*np.arange(n)
+        col = np.arange(n)
+        rows = np.concatenate([row, row+3])
+        cols = np.concatenate([col, col])
+
+        self.declare_partials('q_E', 't', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -466,27 +426,13 @@ class Comm_EarthsSpin(ExplicitComponent):
         """
         t = inputs['t']
 
-        ntime = self.n
-        self.dq_dt = np.zeros((ntime, 4))
+        n = self.n
 
         fact = np.pi / 3600.0 / 24.0
         theta = fact * t
 
-        self.dq_dt[:, 0] = -np.sin(theta) * fact
-        self.dq_dt[:, 3] = -np.cos(theta) * fact
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        if mode == 'fwd':
-            if 't' in d_inputs:
-                for k in range(4):
-                    d_outputs['q_E'][:, k] += self.dq_dt[:, k] * d_inputs['t']
-        else:
-            if 't' in d_inputs:
-                for k in range(4):
-                    d_inputs['t'] += self.dq_dt[:, k] * d_outputs['q_E'][:, k]
+        partials['q_E', 't'][:n] = -np.sin(theta) * fact
+        partials['q_E', 't'][n:2*n] = -np.cos(theta) * fact
 
 
 class Comm_EarthsSpinMtx(ExplicitComponent):
@@ -510,6 +456,13 @@ class Comm_EarthsSpinMtx(ExplicitComponent):
         self.add_output('O_IE', np.zeros((n, 3, 3)), units=None,
                         desc='Rotation matrix from Earth-centered inertial frame to '
                              'Earth-fixed frame over time')
+
+        row = np.tile(np.array([0, 0, 0, 0]), 9) + np.repeat(np.arange(9), 4)
+        col = np.tile(np.arange(4), 9)
+        rows = np.tile(row, n) + np.repeat(9*np.arange(n), 36)
+        cols = np.tile(col, n) + np.repeat(4*np.arange(n), 36)
+
+        self.declare_partials('O_IE', 'q_E', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
@@ -546,7 +499,7 @@ class Comm_EarthsSpinMtx(ExplicitComponent):
         dA_dq = np.zeros((4, 3, 4))
         dB_dq = np.zeros((4, 3, 4))
 
-        self.J = np.zeros((self.n, 3, 3, 4))
+        J = np.zeros((self.n, 3, 3, 4))
 
         # dA_dq
         dA_dq[0, :, 0] = (1, 0, 0)
@@ -602,29 +555,9 @@ class Comm_EarthsSpinMtx(ExplicitComponent):
             B[3, :] = ( q_E[i, 1],  q_E[i, 2],  q_E[i, 3])  # noqa: E201
 
             for k in range(0, 4):
-                self.J[i, :, :, k] = np.dot(dA_dq[:, :, k].T, B) + \
-                    np.dot(A.T, dB_dq[:, :, k])
+                J[i, :, :, k] = np.dot(dA_dq[:, :, k].T, B) + np.dot(A.T, dB_dq[:, :, k])
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        if 'q_E' in d_inputs:
-            dO_IE = d_outputs['O_IE']
-            dq_E = d_inputs['q_E']
-
-            if mode == 'fwd':
-                for u in range(3):
-                    for v in range(3):
-                        for k in range(4):
-                            dO_IE[:, u, v] += self.J[:, u, v, k] * \
-                                dq_E[:, k]
-            else:
-                for u in range(3):
-                    for v in range(3):
-                        for k in range(4):
-                            dq_E[:, k] += self.J[:, u, v, k] * \
-                                dO_IE[:, u, v]
+        partials['O_IE', 'q_E'] = J.flatten()
 
 
 class Comm_GainPattern(ExplicitComponent):
@@ -667,6 +600,11 @@ class Comm_GainPattern(ExplicitComponent):
         self.add_output('gain', np.zeros(n), units=None,
                         desc='Transmitter gain over time')
 
+        row_col = np.arange(n)
+
+        self.declare_partials('gain', 'elevationGS', rows=row_col, cols=row_col)
+        self.declare_partials('gain', 'azimuthGS', rows=row_col, cols=row_col)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -680,25 +618,8 @@ class Comm_GainPattern(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        self.dg_daz = self.MBI.evaluate(self.x, 1)[:, 0]
-        self.dg_del = self.MBI.evaluate(self.x, 2)[:, 0]
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dgain = d_outputs['gain']
-
-        if mode == 'fwd':
-            if 'azimuthGS' in d_inputs:
-                dgain += self.dg_daz * d_inputs['azimuthGS']
-            if 'elevationGS' in d_inputs:
-                dgain += self.dg_del * d_inputs['elevationGS']
-        else:
-            if 'azimuthGS' in d_inputs:
-                d_inputs['azimuthGS'] += self.dg_daz * dgain
-            if 'elevationGS' in d_inputs:
-                d_inputs['elevationGS'] += self.dg_del * dgain
+        partials['gain', 'azimuthGS'] = self.MBI.evaluate(self.x, 1)[:, 0]
+        partials['gain', 'elevationGS'] = self.MBI.evaluate(self.x, 2)[:, 0]
 
 
 class Comm_GSposEarth(ExplicitComponent):
@@ -729,6 +650,10 @@ class Comm_GSposEarth(ExplicitComponent):
                         desc='Position vector from earth to ground station in '
                              'Earth-fixed frame over time')
 
+        self.declare_partials('r_e2g_E', 'lon')
+        self.declare_partials('r_e2g_E', 'lat')
+        self.declare_partials('r_e2g_E', 'alt')
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -749,13 +674,14 @@ class Comm_GSposEarth(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
+        n = self.n
         lat = inputs['lat']
         lon = inputs['lon']
         alt = inputs['alt']
 
-        self.dr_dlon = np.zeros(3)
-        self.dr_dlat = np.zeros(3)
-        self.dr_dalt = np.zeros(3)
+        dr_dlon = np.zeros(3)
+        dr_dlat = np.zeros(3)
+        dr_dalt = np.zeros(3)
 
         cos_lat = np.cos(self.d2r * lat)
         sin_lat = np.sin(self.d2r * lat)
@@ -764,42 +690,21 @@ class Comm_GSposEarth(ExplicitComponent):
 
         r_GS = (self.Re + alt)
 
-        self.dr_dlon[0] = -self.d2r * r_GS * cos_lat * sin_lon
-        self.dr_dlat[0] = -self.d2r * r_GS * sin_lat * cos_lon
-        self.dr_dalt[0] = cos_lat * cos_lon
+        dr_dlon[0] = -self.d2r * r_GS * cos_lat * sin_lon
+        dr_dlat[0] = -self.d2r * r_GS * sin_lat * cos_lon
+        dr_dalt[0] = cos_lat * cos_lon
 
-        self.dr_dlon[1] = self.d2r * r_GS * cos_lat * cos_lon
-        self.dr_dlat[1] = -self.d2r * r_GS * sin_lat * sin_lon
-        self.dr_dalt[1] = cos_lat * sin_lon
+        dr_dlon[1] = self.d2r * r_GS * cos_lat * cos_lon
+        dr_dlat[1] = -self.d2r * r_GS * sin_lat * sin_lon
+        dr_dalt[1] = cos_lat * sin_lon
 
-        self.dr_dlon[2] = 0.
-        self.dr_dlat[2] = self.d2r * r_GS * cos_lat
-        self.dr_dalt[2] = sin_lat
+        dr_dlon[2] = 0.
+        dr_dlat[2] = self.d2r * r_GS * cos_lat
+        dr_dalt[2] = sin_lat
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dr_e2g_E = d_outputs['r_e2g_E']
-
-        if mode == 'fwd':
-            if 'lon' in d_inputs:
-                for k in range(3):
-                    dr_e2g_E[:, k] += self.dr_dlon[k] * d_inputs['lon']
-            if 'lat' in d_inputs:
-                for k in range(3):
-                    dr_e2g_E[:, k] += self.dr_dlat[k] * d_inputs['lat']
-            if 'alt' in d_inputs:
-                for k in range(3):
-                    dr_e2g_E[:, k] += self.dr_dalt[k] * d_inputs['alt']
-        else:
-            for k in range(3):
-                if 'lon' in d_inputs:
-                    d_inputs['lon'] += self.dr_dlon[k] * np.sum(dr_e2g_E[:, k])
-                if 'lat' in d_inputs:
-                    d_inputs['lat'] += self.dr_dlat[k] * np.sum(dr_e2g_E[:, k])
-                if 'alt' in d_inputs:
-                    d_inputs['alt'] += self.dr_dalt[k] * np.sum(dr_e2g_E[:, k])
+        partials['r_e2g_E', 'lon'] = np.tile(dr_dlon, n)
+        partials['r_e2g_E', 'lat'] = np.tile(dr_dlat, n)
+        partials['r_e2g_E', 'alt'] = np.tile(dr_dalt, n)
 
 
 class Comm_GSposECI(ExplicitComponent):
@@ -829,6 +734,18 @@ class Comm_GSposECI(ExplicitComponent):
                         desc='Position vector from earth to ground station in '
                              'Earth-centered inertial frame over time')
 
+        rows = np.tile(np.repeat(0, 3), 3*n) + np.repeat(np.arange(3*n), 3)
+        cols = np.arange(9*n)
+
+        self.declare_partials('r_e2g_I', 'O_IE', rows=rows, cols=cols)
+
+        row = np.tile(np.repeat(0, 3), 3) + np.repeat(np.arange(3), 3)
+        col = np.tile(np.arange(3), 3)
+        rows = np.tile(row, n) + np.repeat(3*np.arange(n), 9)
+        cols = np.tile(col, n) + np.repeat(3*np.arange(n), 9)
+
+        self.declare_partials('r_e2g_I', 'r_e2g_E', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -847,42 +764,14 @@ class Comm_GSposECI(ExplicitComponent):
         O_IE = inputs['O_IE']
         r_e2g_E = inputs['r_e2g_E']
 
-        self.J1 = np.zeros((self.n, 3, 3, 3))
+        J1 = np.zeros((self.n, 3, 3))
 
         for k in range(0, 3):
             for v in range(0, 3):
-                self.J1[:, k, k, v] = r_e2g_E[:, v]
+                J1[:, k, v] = r_e2g_E[:, v]
 
-        self.J2 = O_IE[:]
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dr_e2g_I = d_outputs['r_e2g_I']
-
-        if mode == 'fwd':
-            for k in range(3):
-                for u in range(3):
-                    if 'O_IE' in d_inputs:
-                        for v in range(3):
-                            dr_e2g_I[:, k] += self.J1[:, k, u, v] * \
-                                d_inputs['O_IE'][:, u, v]
-
-                    if 'r_e2g_E' in d_inputs:
-                        dr_e2g_I[:, k] += self.J2[:, k, u] * \
-                            d_inputs['r_e2g_E'][:, u]
-        else:
-            for k in range(3):
-                if 'O_IE' in d_inputs:
-                    for u in range(3):
-                        for v in range(3):
-                            d_inputs['O_IE'][:, u, v] += self.J1[:, k, u, v] * \
-                                dr_e2g_I[:, k]
-                if 'r_e2g_E' in d_inputs:
-                    for j in range(3):
-                        d_inputs['r_e2g_E'][:, j] += self.J2[:, k, j] * \
-                            dr_e2g_I[:, k]
+        partials['r_e2g_I', 'O_IE'] = J1.flatten()
+        partials['r_e2g_I', 'r_e2g_E'] = O_IE.flatten()
 
 
 class Comm_LOS(ExplicitComponent):
@@ -914,6 +803,12 @@ class Comm_LOS(ExplicitComponent):
         self.add_output('CommLOS', np.zeros(n), units=None,
                         desc='Satellite to ground station line of sight over time')
 
+        rows = np.tile(np.array([0, 0, 0]), n) + np.repeat(np.arange(n), 3)
+        cols = np.tile(np.arange(3), n) + np.repeat(3*np.arange(n), 3)
+
+        self.declare_partials('CommLOS', 'r_b2g_I', rows=rows, cols=cols)
+        self.declare_partials('CommLOS', 'r_e2g_I', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -940,51 +835,36 @@ class Comm_LOS(ExplicitComponent):
         Calculate and save derivatives. (i.e., Jacobian)
         """
         n = self.n
+        Re = self.Re
         r_b2g_I = inputs['r_b2g_I']
         r_e2g_I = inputs['r_e2g_I']
 
-        self.dLOS_drb = np.zeros((self.n, 3))
-        self.dLOS_dre = np.zeros((self.n, 3))
+        dLOS_drb = np.zeros((n, 3))
+        dLOS_dre = np.zeros((n, 3))
 
-        Rb = 10.0
-        for i in range(0, n):
+        Rb = 100.0
+        for i in range(n):
 
-            proj = np.dot(r_b2g_I[i, :], r_e2g_I[i, :]) / self.Re
+            proj = np.dot(r_b2g_I[i, :], r_e2g_I[i, :]) / Re
 
             if proj > 0:
-                self.dLOS_drb[i, :] = 0.
-                self.dLOS_dre[i, :] = 0.
+                continue
+
             elif proj < -Rb:
-                self.dLOS_drb[i, :] = 0.
-                self.dLOS_dre[i, :] = 0.
+                continue
+
             else:
                 x = (proj - 0) / (-Rb - 0)
                 dx_dproj = -1. / Rb
                 dLOS_dx = 6 * x - 6 * x ** 2
-                dproj_drb = r_e2g_I[i, :]
-                dproj_dre = r_b2g_I[i, :]
+                dproj_drb = r_e2g_I[i, :] / Re
+                dproj_dre = r_b2g_I[i, :] / Re
 
-                self.dLOS_drb[i, :] = dLOS_dx * dx_dproj * dproj_drb
-                self.dLOS_dre[i, :] = dLOS_dx * dx_dproj * dproj_dre
+                dLOS_drb[i, :] = dLOS_dx * dx_dproj * dproj_drb
+                dLOS_dre[i, :] = dLOS_dx * dx_dproj * dproj_dre
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dCommLOS = d_outputs['CommLOS']
-
-        if mode == 'fwd':
-            for k in range(3):
-                if 'r_b2g_I' in d_inputs:
-                    dCommLOS += self.dLOS_drb[:, k] * d_inputs['r_b2g_I'][:, k]
-                if 'r_e2g_I' in d_inputs:
-                    dCommLOS += self.dLOS_dre[:, k] * d_inputs['r_e2g_I'][:, k]
-        else:
-            for k in range(3):
-                if 'r_b2g_I' in d_inputs:
-                    d_inputs['r_b2g_I'][:, k] += self.dLOS_drb[:, k] * dCommLOS
-                if 'r_e2g_I' in d_inputs:
-                    d_inputs['r_e2g_I'][:, k] += self.dLOS_dre[:, k] * dCommLOS
+        partials['CommLOS', 'r_b2g_I'] = dLOS_drb.flatten()
+        partials['CommLOS', 'r_e2g_I'] = dLOS_dre.flatten()
 
 
 class Comm_VectorAnt(ExplicitComponent):
@@ -1013,48 +893,42 @@ class Comm_VectorAnt(ExplicitComponent):
                         desc='Position vector from satellite to ground station '
                              'in antenna angle frame over time')
 
+        row = np.tile(np.repeat(0, 3), 3) + np.repeat(np.arange(3), 3)
+        col = np.tile(np.arange(3), 3)
+        rows = np.tile(row, n) + np.repeat(3*np.arange(n), 9)
+        cols = np.tile(col, n) + np.repeat(3*np.arange(n), 9)
+
+        self.declare_partials('r_b2g_A', 'r_b2g_B', rows=rows, cols=cols)
+
+        row = np.tile(np.array([0, 0, 0]), n) + np.repeat(3*np.arange(n), 3)
+        col = np.tile(np.arange(3), n) + np.repeat(9*np.arange(n), 3)
+
+        rows = np.concatenate([row, row+1, row+2])
+        cols = np.concatenate([col, col+3, col+6])
+
+        self.declare_partials('r_b2g_A', 'O_AB', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
-        outputs['r_b2g_A'] = computepositionrotd(self.n, inputs['r_b2g_B'],
-                                                 inputs['O_AB'])
+        outputs['r_b2g_A'] = np.einsum('ijk,ik->ij', inputs['O_AB'], inputs['r_b2g_B'])
 
     def compute_partials(self, inputs, partials):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        self.J1, self.J2 = computepositionrotdjacobian(self.n, inputs['r_b2g_B'],
-                                                       inputs['O_AB'])
+        n = self.n
+        O_AB = inputs['O_AB']
+        r_b2g_B = inputs['r_b2g_B']
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dr_b2g_A = d_outputs['r_b2g_A']
+        partials['r_b2g_A', 'r_b2g_B'] = O_AB.flatten()
 
-        if mode == 'fwd':
-            for k in range(3):
-                if 'O_AB' in d_inputs:
-                    for u in range(3):
-                        for v in range(3):
-                            dr_b2g_A[:, k] += self.J1[:, k, u, v] * \
-                                d_inputs['O_AB'][:, u, v]
-                if 'r_b2g_B' in d_inputs:
-                    for j in range(3):
-                        dr_b2g_A[:, k] += self.J2[:, k, j] * \
-                            d_inputs['r_b2g_B'][:, j]
-        else:
-            for k in range(3):
-                if 'O_AB' in d_inputs:
-                    for u in range(3):
-                        for v in range(3):
-                            d_inputs['O_AB'][:, u, v] += self.J1[:, k, u, v] * \
-                                dr_b2g_A[:, k]
-                if 'r_b2g_B' in d_inputs:
-                    for j in range(3):
-                        d_inputs['r_b2g_B'][:, j] += self.J2[:, k, j] * \
-                            dr_b2g_A[:, k]
+        nn = 3*n
+        dO_AB = r_b2g_B.flatten()
+        partials['r_b2g_A', 'O_AB'][:nn] = dO_AB
+        partials['r_b2g_A', 'O_AB'][nn:2*nn] = dO_AB
+        partials['r_b2g_A', 'O_AB'][2*nn:3*nn] = dO_AB
 
 
 class Comm_VectorBody(ExplicitComponent):
@@ -1083,60 +957,42 @@ class Comm_VectorBody(ExplicitComponent):
                         desc='Position vector from satellite to ground station '
                              'in body-fixed frame over time')
 
+        row = np.tile(np.repeat(0, 3), 3) + np.repeat(np.arange(3), 3)
+        col = np.tile(np.arange(3), 3)
+        rows = np.tile(row, n) + np.repeat(3*np.arange(n), 9)
+        cols = np.tile(col, n) + np.repeat(3*np.arange(n), 9)
+
+        self.declare_partials('r_b2g_B', 'r_b2g_I', rows=rows, cols=cols)
+
+        row = np.tile(np.array([0, 0, 0]), n) + np.repeat(3*np.arange(n), 3)
+        col = np.tile(np.arange(3), n) + np.repeat(9*np.arange(n), 3)
+
+        rows = np.concatenate([row, row+1, row+2])
+        cols = np.concatenate([col, col+3, col+6])
+
+        self.declare_partials('r_b2g_B', 'O_BI', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
-        r_b2g_I = inputs['r_b2g_I']
-        O_BI = inputs['O_BI']
-        r_b2g_B = outputs['r_b2g_B']
-
-        for i in range(0, self.n):
-            r_b2g_B[i, :] = np.dot(O_BI[i, :, :], r_b2g_I[i, :])
+        outputs['r_b2g_B'] = np.einsum('ijk,ik->ij', inputs['O_BI'], inputs['r_b2g_I'])
 
     def compute_partials(self, inputs, partials):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        r_b2g_I = inputs['r_b2g_I']
+        n = self.n
         O_BI = inputs['O_BI']
+        r_b2g_I = inputs['r_b2g_I']
 
-        self.J1 = np.zeros((self.n, 3, 3, 3))
+        partials['r_b2g_B', 'r_b2g_I'] = O_BI.flatten()
 
-        for k in range(0, 3):
-            for v in range(0, 3):
-                self.J1[:, k, k, v] = r_b2g_I[:, v]
-
-        self.J2 = O_BI[:]
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dr_b2g_B = d_outputs['r_b2g_B']
-
-        if mode == 'fwd':
-            for k in range(3):
-                if 'O_BI' in d_inputs:
-                    for u in range(3):
-                        for v in range(3):
-                            dr_b2g_B[:, k] += self.J1[:, k, u, v] * \
-                                d_inputs['O_BI'][:, u, v]
-                if 'r_b2g_I' in d_inputs:
-                    for j in range(3):
-                        dr_b2g_B[:, k] += self.J2[:, k, j] * \
-                            d_inputs['r_b2g_I'][:, j]
-        else:
-            for k in range(3):
-                if 'O_BI' in d_inputs:
-                    for u in range(3):
-                        for v in range(3):
-                            d_inputs['O_BI'][:, u, v] += self.J1[:, k, u, v] * \
-                                dr_b2g_B[:, k]
-                if 'r_b2g_I' in d_inputs:
-                    for j in range(3):
-                        d_inputs['r_b2g_I'][:, j] += self.J2[:, k, j] * \
-                            dr_b2g_B[:, k]
+        nn = 3*n
+        dO_BI = r_b2g_I.flatten()
+        partials['r_b2g_B', 'O_BI'][:nn] = dO_BI
+        partials['r_b2g_B', 'O_BI'][nn:2*nn] = dO_BI
+        partials['r_b2g_B', 'O_BI'][2*nn:3*nn] = dO_BI
 
 
 class Comm_VectorECI(ExplicitComponent):
@@ -1165,31 +1021,21 @@ class Comm_VectorECI(ExplicitComponent):
                         desc='Position vector from satellite to ground station '
                              'in Earth-centered inertial frame over time')
 
+        row_col = np.arange(3*n)
+        vals = np.ones(3*n)
+
+        self.declare_partials('r_b2g_I', 'r_e2g_I', rows=row_col, cols=row_col, val=vals)
+
+        cols = np.tile(np.array([0, 1, 2]), n) + np.repeat(6*np.arange(n), 3)
+        vals = -vals
+
+        self.declare_partials('r_b2g_I', 'r_e2b_I', rows=row_col, cols=cols, val=vals)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
         outputs['r_b2g_I'] = inputs['r_e2g_I'] - inputs['r_e2b_I'][:, :3]
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dr_b2g_I = d_outputs['r_b2g_I']
-
-        if mode == 'fwd':
-            if 'r_e2g_I' in d_inputs:
-                dr_b2g_I += d_inputs['r_e2g_I']
-            if 'r_e2b_I' in d_inputs:
-                dr_b2g_I += -d_inputs['r_e2b_I'][:, :3]
-
-        else:
-            if 'r_e2g_I' in d_inputs:
-                d_inputs['r_e2g_I'] += dr_b2g_I
-            if 'r_e2b_I' in d_inputs:
-                dr_e2b_I = np.zeros(d_inputs['r_e2b_I'].shape)
-                dr_e2b_I[:, :3] += -dr_b2g_I
-                d_inputs['r_e2b_I'] += dr_e2b_I
 
 
 class Comm_VectorSpherical(ExplicitComponent):

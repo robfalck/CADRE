@@ -220,145 +220,149 @@ class TestCADRE(unittest.TestCase):
         #self.prob.run_model()
         #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_AntRotation(self):
-        compname = 'Comm_AntRotation'
-        inputs = ['antAngle']
-        outputs = ['q_A']
-        state0 = []
+    #def test_Comm_AntRotation(self):
+        #compname = 'Comm_AntRotation'
+        #inputs = ['antAngle']
+        #outputs = ['q_A']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_AntRotationMtx(self):
-        compname = 'Comm_AntRotationMtx'
-        inputs = ['q_A']
-        outputs = ['O_AB']
-        state0 = []
+    #def test_Comm_AntRotationMtx(self):
+        #compname = 'Comm_AntRotationMtx'
+        #inputs = ['q_A']
+        #outputs = ['O_AB']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_BitRate(self):
-        compname = 'Comm_BitRate'
-        inputs = ['P_comm', 'gain', 'GSdist', 'CommLOS']
-        outputs = ['Dr']
-        state0 = []
+    #def test_Comm_BitRate(self):
+        #compname = 'Comm_BitRate'
+        #inputs = ['P_comm', 'gain', 'GSdist', 'CommLOS']
+        #outputs = ['Dr']
+        #state0 = []
 
-        np.random.seed(1001)
+        #np.random.seed(1001)
 
-        self.setup(compname, inputs, state0)
+        #self.setup(compname, inputs, state0)
 
-        # These need to be a certain magnitude so it doesn't blow up
-        shape = self.inputs_dict['P_comm']['value'].shape
-        self.prob['P_comm'] = np.ones(shape)
-        shape = self.inputs_dict['GSdist']['value'].shape
-        self.prob['GSdist'] = np.random.random(shape) * 1e3
+        ## These need to be a certain magnitude so it doesn't blow up
+        #shape = self.inputs_dict['P_comm']['value'].shape
+        #self.prob['P_comm'] = np.ones(shape)
+        #shape = self.inputs_dict['GSdist']['value'].shape
+        #self.prob['GSdist'] = np.random.random(shape) * 1e3
 
-        self.prob.run_model()
+        #self.prob.run_model()
 
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_Distance(self):
-        compname = 'Comm_Distance'
-        inputs = ['r_b2g_A']
-        outputs = ['GSdist']
-        state0 = []
+    #def test_Comm_Distance(self):
+        #compname = 'Comm_Distance'
+        #inputs = ['r_b2g_A']
+        #outputs = ['GSdist']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_EarthsSpin(self):
-        compname = 'Comm_EarthsSpin'
-        inputs = ['t']
-        outputs = ['q_E']
-        state0 = []
+    #def test_Comm_EarthsSpin(self):
+        #compname = 'Comm_EarthsSpin'
+        #inputs = ['t']
+        #outputs = ['q_E']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_EarthsSpinMtx(self):
-        compname = 'Comm_EarthsSpinMtx'
-        inputs = ['q_E']
-        outputs = ['O_IE']
-        state0 = []
+    #def test_Comm_EarthsSpinMtx(self):
+        #compname = 'Comm_EarthsSpinMtx'
+        #inputs = ['q_E']
+        #outputs = ['O_IE']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_GainPattern(self):
-        compname = 'Comm_GainPattern'
-        inputs = ['azimuthGS', 'elevationGS']
-        outputs = ['gain']
-        state0 = []
+    #def test_Comm_GainPattern(self):
+        #compname = 'Comm_GainPattern'
+        #inputs = ['azimuthGS', 'elevationGS']
+        #outputs = ['gain']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_GSposEarth(self):
-        compname = 'Comm_GSposEarth'
-        inputs = ['lon', 'lat', 'alt']
-        outputs = ['r_e2g_E']
-        state0 = []
+    #def test_Comm_GSposEarth(self):
+        #compname = 'Comm_GSposEarth'
+        #inputs = ['lon', 'lat', 'alt']
+        #outputs = ['r_e2g_E']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_GSposECI(self):
-        compname = 'Comm_GSposECI'
-        inputs = ['O_IE', 'r_e2g_E']
-        outputs = ['r_e2g_I']
-        state0 = []
+    #def test_Comm_GSposECI(self):
+        #compname = 'Comm_GSposECI'
+        #inputs = ['O_IE', 'r_e2g_E']
+        #outputs = ['r_e2g_I']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_LOS(self):
-        compname = 'Comm_LOS'
-        inputs = ['r_b2g_I', 'r_e2g_I']
-        outputs = ['CommLOS']
-        state0 = []
+    #def test_Comm_LOS(self):
+        #compname = 'Comm_LOS'
+        #inputs = ['r_b2g_I', 'r_e2g_I']
+        #outputs = ['CommLOS']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
 
-    def test_Comm_VectorAnt(self):
-        compname = 'Comm_VectorAnt'
-        inputs = ['r_b2g_B', 'O_AB']
-        outputs = ['r_b2g_A']
-        state0 = []
+        ## needs to be negative to test not trivial branch.
+        #self.prob['r_e2g_I'] = -self.prob['r_e2g_I']
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_VectorBody(self):
-        compname = 'Comm_VectorBody'
-        inputs = ['r_b2g_I', 'O_BI']
-        outputs = ['r_b2g_B']
-        state0 = []
+    #def test_Comm_VectorAnt(self):
+        #compname = 'Comm_VectorAnt'
+        #inputs = ['r_b2g_B', 'O_AB']
+        #outputs = ['r_b2g_A']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_VectorECI(self):
-        compname = 'Comm_VectorECI'
-        inputs = ['r_e2g_I', 'r_e2b_I']
-        outputs = ['r_b2g_I']
-        state0 = []
+    #def test_Comm_VectorBody(self):
+        #compname = 'Comm_VectorBody'
+        #inputs = ['r_b2g_I', 'O_BI']
+        #outputs = ['r_b2g_B']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
+
+    #def test_Comm_VectorECI(self):
+        #compname = 'Comm_VectorECI'
+        #inputs = ['r_e2g_I', 'r_e2b_I']
+        #outputs = ['r_b2g_I']
+        #state0 = []
+
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
     def test_Comm_VectorSpherical(self):
         compname = 'Comm_VectorSpherical'
