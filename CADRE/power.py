@@ -41,10 +41,6 @@ class Power_CellVoltage(ExplicitComponent):
 
         self.x = np.zeros((84 * n, 3), order='F')
         self.xV = self.x.reshape((n, 7, 12, 3), order='F')
-        self.dV_dL = np.zeros((n, 12), order='F')
-        self.dV_dT = np.zeros((n, 12, 5), order='F')
-        self.dV_dA = np.zeros((n, 7, 12), order='F')
-        self.dV_dI = np.zeros((n, 12), order='F')
 
     def setup(self):
         n = self.n
@@ -66,6 +62,28 @@ class Power_CellVoltage(ExplicitComponent):
         self.add_output('V_sol', np.zeros((n, 12)), units='V',
                         desc='Output voltage of solar panel over time')
 
+        rows = np.arange(n*12)
+        cols = np.tile(np.repeat(0, 12), n) + np.repeat(np.arange(n), 12)
+
+        self.declare_partials('V_sol', 'LOS', rows=rows, cols=cols)
+
+        row = np.tile(np.repeat(0, 5), 12) + np.repeat(np.arange(12), 5)
+        rows = np.tile(row, n) + np.repeat(12*np.arange(n), 60)
+        col = np.tile(np.arange(5), 12)
+        cols = np.tile(col, n) + np.repeat(5*np.arange(n), 60)
+
+        self.declare_partials('V_sol', 'temperature', rows=rows, cols=cols)
+
+        row = np.tile(np.arange(12), 7)
+        rows = np.tile(row, n) + np.repeat(12*np.arange(n), 84)
+        cols = np.arange(n*7*12)
+
+        self.declare_partials('V_sol', 'exposedArea', rows=rows, cols=cols)
+
+        row_col = np.arange(n*12)
+
+        self.declare_partials('V_sol', 'Isetpt', rows=row_col, cols=row_col)
+
     def setx(self, inputs):
         temperature = inputs['temperature']
         LOS = inputs['LOS']
@@ -83,10 +101,11 @@ class Power_CellVoltage(ExplicitComponent):
         """
         Calculate outputs.
         """
+        n = self.n
         self.setx(inputs)
-        self.raw = self.MBI.evaluate(self.x)[:, 0].reshape((self.n, 7, 12),
-                                                           order='F')
-        outputs['V_sol'] = np.zeros((self.n, 12))
+        self.raw = self.MBI.evaluate(self.x)[:, 0].reshape((n, 7, 12), order='F')
+
+        outputs['V_sol'] = np.zeros((n, 12))
         for c in range(7):
             outputs['V_sol'] += self.raw[:, c, :]
 
@@ -94,67 +113,72 @@ class Power_CellVoltage(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
+        n = self.n
+
         exposedArea = inputs['exposedArea']
         LOS = inputs['LOS']
 
-        self.raw1 = self.MBI.evaluate(self.x, 1)[:, 0].reshape((self.n, 7,
-                                                                12), order='F')
-        self.raw2 = self.MBI.evaluate(self.x, 2)[:, 0].reshape((self.n, 7,
-                                                                12), order='F')
-        self.raw3 = self.MBI.evaluate(self.x, 3)[:, 0].reshape((self.n, 7,
-                                                                12), order='F')
-        self.dV_dL[:] = 0.0
-        self.dV_dT[:] = 0.0
-        self.dV_dA[:] = 0.0
-        self.dV_dI[:] = 0.0
+        raw1 = self.MBI.evaluate(self.x, 1)[:, 0].reshape((n, 7, 12), order='F')
+        raw2 = self.MBI.evaluate(self.x, 2)[:, 0].reshape((n, 7, 12), order='F')
+        raw3 = self.MBI.evaluate(self.x, 3)[:, 0].reshape((n, 7, 12), order='F')
+
+        dV_dL = np.empty((n, 12))
+        dV_dT = np.zeros((n, 12, 5))
+        dV_dA = np.zeros((n, 7, 12))
+        dV_dI = np.empty((n, 12))
 
         for p in range(12):
             i = 4 if p < 4 else (p % 4)
             for c in range(7):
-                self.dV_dL[:, p] += self.raw2[:, c, p] * exposedArea[:, c, p]
-                self.dV_dT[:, p, i] += self.raw1[:, c, p]
-                self.dV_dA[:, c, p] += self.raw2[:, c, p] * LOS
-                self.dV_dI[:, p] += self.raw3[:, c, p]
+                dV_dL[:, p] += raw2[:, c, p] * exposedArea[:, c, p]
+                dV_dT[:, p, i] += raw1[:, c, p]
+                dV_dA[:, c, p] += raw2[:, c, p] * LOS
+                dV_dI[:, p] += raw3[:, c, p]
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dV_sol = d_outputs['V_sol']
+        partials['V_sol', 'LOS'] = dV_dL.flatten()
+        partials['V_sol', 'temperature'] = dV_dT.flatten()
+        partials['V_sol', 'exposedArea'] = dV_dA.flatten()
+        partials['V_sol', 'Isetpt'] = dV_dI.flatten()
 
-        if mode == 'fwd':
-            if 'LOS' in d_inputs:
-                dV_sol += self.dV_dL * d_inputs['LOS'].reshape((self.n, 1))
+    #def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        #"""
+        #Matrix-vector product with the Jacobian.
+        #"""
+        #dV_sol = d_outputs['V_sol']
 
-            if 'temperature' in d_inputs:
-                for p in range(12):
-                    i = 4 if p < 4 else (p % 4)
-                    dV_sol[:, p] += self.dV_dT[:, p, i] * d_inputs['temperature'][:, i]
+        #if mode == 'fwd':
+            #if 'LOS' in d_inputs:
+                #dV_sol += self.dV_dL * d_inputs['LOS'].reshape((self.n, 1))
 
-            if 'Isetpt' in d_inputs:
-                dV_sol += self.dV_dI * d_inputs['Isetpt']
+            #if 'temperature' in d_inputs:
+                #for p in range(12):
+                    #i = 4 if p < 4 else (p % 4)
+                    #dV_sol[:, p] += self.dV_dT[:, p, i] * d_inputs['temperature'][:, i]
 
-            if 'exposedArea' in d_inputs:
-                for p in range(12):
-                    dV_sol[:, p] += \
-                        np.sum(self.dV_dA[:, :, p] * d_inputs['exposedArea'][:, :, p], 1)
-        else:
-            for p in range(12):
-                i = 4 if p < 4 else (p % 4)
+            #if 'Isetpt' in d_inputs:
+                #dV_sol += self.dV_dI * d_inputs['Isetpt']
 
-                if 'LOS' in d_inputs:
-                    d_inputs['LOS'] += (self.dV_dL[:, p] * dV_sol[:, p]).T
+            #if 'exposedArea' in d_inputs:
+                #for p in range(12):
+                    #dV_sol[:, p] += \
+                        #np.sum(self.dV_dA[:, :, p] * d_inputs['exposedArea'][:, :, p], 1)
+        #else:
+            #for p in range(12):
+                #i = 4 if p < 4 else (p % 4)
 
-                if 'temperature' in d_inputs:
-                    d_inputs['temperature'][:, i] += self.dV_dT[:, p, i] * dV_sol[:, p]
+                #if 'LOS' in d_inputs:
+                    #d_inputs['LOS'] += (self.dV_dL[:, p] * dV_sol[:, p]).T
 
-                if 'Isetpt' in d_inputs:
-                    d_inputs['Isetpt'][:, p] += self.dV_dI[:, p] * dV_sol[:, p]
+                #if 'temperature' in d_inputs:
+                    #d_inputs['temperature'][:, i] += self.dV_dT[:, p, i] * dV_sol[:, p]
 
-                if 'exposedArea' in d_inputs:
-                    dexposedArea = d_inputs['exposedArea']
-                    for c in range(7):
-                        dexposedArea[:, c, p] += self.dV_dA[:, c, p] * dV_sol[:, p]
+                #if 'Isetpt' in d_inputs:
+                    #d_inputs['Isetpt'][:, p] += self.dV_dI[:, p] * dV_sol[:, p]
+
+                #if 'exposedArea' in d_inputs:
+                    #dexposedArea = d_inputs['exposedArea']
+                    #for c in range(7):
+                        #dexposedArea[:, c, p] += self.dV_dA[:, c, p] * dV_sol[:, p]
 
 
 class Power_SolarPower(ExplicitComponent):

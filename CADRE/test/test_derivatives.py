@@ -364,40 +364,40 @@ class TestCADRE(unittest.TestCase):
         #self.prob.run_model()
         #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Comm_VectorSpherical(self):
-        compname = 'Comm_VectorSpherical'
-        inputs = ['r_b2g_A']
-        outputs = ['azimuthGS', 'elevationGS']
-        state0 = []
+    #def test_Comm_VectorSpherical(self):
+        #compname = 'Comm_VectorSpherical'
+        #inputs = ['r_b2g_A']
+        #outputs = ['azimuthGS', 'elevationGS']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Orbit_Dynamics(self):
-        compname = 'Orbit_Dynamics'
-        inputs = ['r_e2b_I0']
-        outputs = ['r_e2b_I']
-        state0 = []
+    #def test_Orbit_Dynamics(self):
+        #compname = 'Orbit_Dynamics'
+        #inputs = ['r_e2b_I0']
+        #outputs = ['r_e2b_I']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
+        #self.setup(compname, inputs, state0)
 
-        self.prob.model.comp.h = 0.01
-        self.prob['r_e2b_I0'][:3] = np.random.random((3)) * 1e6
-        self.prob['r_e2b_I0'][3:] = np.random.random((3)) * 1e5
+        #self.prob.model.comp.h = 0.01
+        #self.prob['r_e2b_I0'][:3] = np.random.random((3)) * 1e6
+        #self.prob['r_e2b_I0'][3:] = np.random.random((3)) * 1e5
 
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Orbit_Initial(self):
-        compname = 'Orbit_Initial'
-        inputs = ['altPerigee', 'altApogee', 'RAAN', 'Inc', 'argPerigee', 'trueAnomaly']
-        outputs = ['r_e2b_I0']
-        state0 = []
+    #def test_Orbit_Initial(self):
+        #compname = 'Orbit_Initial'
+        #inputs = ['altPerigee', 'altApogee', 'RAAN', 'Inc', 'argPerigee', 'trueAnomaly']
+        #outputs = ['r_e2b_I0']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
     def test_Power_CellVoltage(self):
         compname = 'Power_CellVoltage'
