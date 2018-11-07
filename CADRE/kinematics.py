@@ -95,14 +95,10 @@ def arctan(x, y):
 
 def computepositionsphericaljacobian(n, nJ, v):
     """
-    Compute Jacobian across conversion to spherical coords.
+    Compute flat sparsely-specified Jacobian across conversion to spherical coords.
     """
     Ja1 = np.empty(nJ)
-    Ji1 = np.empty(nJ)
-    Jj1 = np.empty(nJ)
     Ja2 = np.empty(nJ)
-    Ji2 = np.empty(nJ)
-    Jj2 = np.empty(nJ)
 
     for i in range(n):
         x = v[i, 0]
@@ -127,10 +123,6 @@ def computepositionsphericaljacobian(n, nJ, v):
         for k in range(3):
             iJ = i*3 + k
             Ja1[iJ] = da_dr[k]
-            Ji1[iJ] = i
-            Jj1[iJ] = iJ
             Ja2[iJ] = de_dr[k]
-            Ji2[iJ] = i
-            Jj2[iJ] = iJ
 
-    return Ja1, Ji1, Jj1, Ja2, Ji2, Jj2
+    return Ja1, Ja2

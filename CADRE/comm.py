@@ -1064,6 +1064,13 @@ class Comm_VectorSpherical(ExplicitComponent):
                         desc='Elevation angle from satellite to ground station '
                              'in Earth-fixed frame over time')
 
+        rows = np.tile(np.array([0, 0, 0]), n) + np.repeat(np.arange(n), 3)
+        cols = np.arange(n*3)
+
+        self.declare_partials('elevationGS', 'r_b2g_A', rows=rows, cols=cols)
+
+        self.declare_partials('azimuthGS', 'r_b2g_A', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -1076,32 +1083,9 @@ class Comm_VectorSpherical(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        self.Ja1, self.Ji1, self.Jj1, self.Ja2, self.Ji2, self.Jj2 = \
-            computepositionsphericaljacobian(self.n, 3 * self.n, inputs['r_b2g_A'])
+        n = self.n
 
-        self.J1 = scipy.sparse.csc_matrix((self.Ja1, (self.Ji1, self.Jj1)),
-                                          shape=(self.n, 3 * self.n))
-        self.J2 = scipy.sparse.csc_matrix((self.Ja2, (self.Ji2, self.Jj2)),
-                                          shape=(self.n, 3 * self.n))
-        self.J1T = self.J1.transpose()
-        self.J2T = self.J2.transpose()
+        Ja1, Ja2 = computepositionsphericaljacobian(n, 3 * n, inputs['r_b2g_A'])
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        if mode == 'fwd':
-            if 'r_b2g_A' in d_inputs:
-                r_b2g_A = d_inputs['r_b2g_A'].reshape((3 * self.n))
-                if 'azimuthGS' in d_outputs:
-                    d_outputs['azimuthGS'] += self.J1.dot(r_b2g_A)
-                if 'elevationGS' in d_outputs:
-                    d_outputs['elevationGS'] += self.J2.dot(r_b2g_A)
-        else:
-            if 'r_b2g_A' in d_inputs:
-                if 'azimuthGS' in d_outputs:
-                    az_GS = d_outputs['azimuthGS']
-                    d_inputs['r_b2g_A'] += (self.J1T.dot(az_GS)).reshape((self.n, 3))
-                if 'elevationGS' in d_outputs:
-                    el_GS = d_outputs['elevationGS']
-                    d_inputs['r_b2g_A'] += (self.J2T.dot(el_GS)).reshape((self.n, 3))
+        partials['azimuthGS', 'r_b2g_A'] = Ja1
+        partials['elevationGS', 'r_b2g_A'] = Ja2
