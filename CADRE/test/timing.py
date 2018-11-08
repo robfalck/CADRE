@@ -7,7 +7,7 @@ import time
 
 import numpy as np
 
-from openmdao.api import Problem
+from openmdao.api import Problem, DirectSolver
 
 from CADRE.CADRE_group import CADRE
 from CADRE.test.util import load_validation_data
@@ -18,7 +18,11 @@ n, m, h, setd = load_validation_data(idx='0')
 # instantiate Problem with CADRE model
 t0 = time.time()
 model = CADRE(n=n, m=m)
+#model = CADRE(n=n, m=m, assembled_jac_type='csc')
+
 prob = Problem(model)
+#model.linear_solver = DirectSolver(assemble_jac=True)
+
 print("Instantiation:  ", time.time() - t0, 's')
 
 # do problem setup
