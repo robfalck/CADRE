@@ -107,7 +107,7 @@ class ThermalTemperatureComp(ExplicitComponent):
         rows = np.tile(4, nn) + 5*np.arange(nn)
         cols = np.arange(nn)
 
-        self.declare_partials(of='dXdt:temperature', wrt='P_comm', rows=rows, cols=cols)
+        self.declare_partials(of='dXdt:temperature', wrt='P_comm', rows=rows, cols=cols, val=4.0/m_b/cp_b)
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
@@ -155,15 +155,14 @@ class ThermalTemperatureComp(ExplicitComponent):
         d_exposedArea = np.zeros((nn, 7, 12), dtype=temperature.dtype)
         d_cellInstd = np.zeros((nn, 7, 12), dtype=temperature.dtype)
         d_LOS = np.zeros((nn, 5), dtype=temperature.dtype)
-        d_Pcomm = np.zeros((nn, ), dtype=temperature.dtype)
 
         alpha = alpha_c*cellInstd + alpha_r - alpha_r*cellInstd
         sum_eps = 4.0 * K * A_T * np.sum(eps_c*cellInstd + eps_r - eps_r*cellInstd, 0)
 
-        for j in range(nn):
+        dalpha_dw = alpha_c - alpha_r
+        deps_dw = eps_c - eps_r
 
-            dalpha_dw = alpha_c - alpha_r
-            deps_dw = eps_c - eps_r
+        for j in range(nn):
 
             alpha_A_sum = np.sum(alpha * exposedArea[j, :, :], 0)
 
@@ -184,10 +183,7 @@ class ThermalTemperatureComp(ExplicitComponent):
                 d_cellInstd[j, :, p] = dalpha_dw * exposedArea[j, :, p] * fact1 - deps_dw * fact2
                 d_exposedArea[j, :, p] = alpha[:, p] * fact1
 
-            d_Pcomm[j] = 4.0 / m_b / cp_b
-
         partials['dXdt:temperature', 'temperature'] = d_temperature.flatten()
         partials['dXdt:temperature', 'exposedArea'] = d_exposedArea.flatten()
         partials['dXdt:temperature', 'cellInstd'] = d_cellInstd.flatten()
         partials['dXdt:temperature', 'LOS'] = d_LOS.flatten()
-        partials['dXdt:temperature', 'P_comm'] = d_Pcomm.flatten()
