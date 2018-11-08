@@ -1,8 +1,8 @@
 """
 Thermal discipline for CADRE
 """
-
 from six.moves import range
+
 import numpy as np
 
 from CADRE.rk4 import RK4
@@ -25,7 +25,7 @@ K = 5.67051e-8
 
 class ThermalTemperature(RK4):
     """
-    Calculates the temperature distribution on the solar panels.
+    Computes the rate of change of the temperature distribution on the solar panels.
     """
     def __init__(self, n_times, h):
         super(ThermalTemperature, self).__init__(n_times, h)
@@ -65,7 +65,6 @@ class ThermalTemperature(RK4):
         """
         Calculate outputs.
         """
-
         temperature = outputs['temperature']
 
         # implementation of fixTemps from Thermal_Temperature.f90
@@ -123,7 +122,7 @@ class ThermalTemperature(RK4):
         dfdy = np.zeros((5, 5))
 
         # Panels
-        for p in range(0, 12):
+        for p in range(12):
 
             # Body
             if p < 4:
