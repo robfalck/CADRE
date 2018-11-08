@@ -141,43 +141,11 @@ class Solar_ExposedArea(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        self.Jfin = self.MBI.evaluate(self.x, 1).reshape(self.n, self.nc, self.np, order='F')
-        self.Jaz = self.MBI.evaluate(self.x, 2).reshape(self.n, self.nc, self.np, order='F')
-        self.Jel = self.MBI.evaluate(self.x, 3).reshape(self.n, self.nc, self.np, order='F')
+        Jfin = self.MBI.evaluate(self.x, 1).reshape(self.n, self.nc, self.np, order='F')
+        Jaz = self.MBI.evaluate(self.x, 2).reshape(self.n, self.nc, self.np, order='F')
+        Jel = self.MBI.evaluate(self.x, 3).reshape(self.n, self.nc, self.np, order='F')
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        n = self.n
-        nc = self.nc
-        deA = d_outputs['exposedArea']
+        partials['exposedArea', 'finAngle'] = Jfin.flatten()
+        partials['exposedArea', 'azimuth'] = Jaz.flatten()
+        partials['exposedArea', 'elevation'] = Jel.flatten()
 
-        if mode == 'fwd':
-            for c in range(nc):
-                if 'finAngle' in d_inputs:
-                    deA[:, c, :] += \
-                        self.Jfin[:, c, :] * d_inputs['finAngle']
-                if 'azimuth' in d_inputs:
-                    deA[:, c, :] += \
-                        self.Jaz[:, c, :] * d_inputs['azimuth'].reshape((n, 1))
-                if 'elevation' in d_inputs:
-                    deA[:, c, :] += \
-                        self.Jel[:, c, :] * d_inputs['elevation'].reshape((n, 1))
-        else:
-            for c in range(nc):
-                # incoming arg is often sparse, so check it first
-                if len(np.nonzero(d_outputs['exposedArea'][:, c, :])[0]) == 0:
-                    continue
-                if 'finAngle' in d_inputs:
-                    d_inputs['finAngle'] += \
-                        np.sum(
-                            self.Jfin[:, c, :] * deA[:, c, :])
-                if 'azimuth' in d_inputs:
-                    d_inputs['azimuth'] += \
-                        np.sum(
-                            self.Jaz[:, c, :] * deA[:, c, :], 1)
-                if 'elevation' in d_inputs:
-                    d_inputs['elevation'] += \
-                        np.sum(
-                            self.Jel[:, c, :] * deA[:, c, :], 1)

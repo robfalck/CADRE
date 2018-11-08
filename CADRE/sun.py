@@ -41,15 +41,26 @@ class Sun_LOS(ExplicitComponent):
         self.add_output('LOS', np.zeros((n, ), order='F'), units=None,
                         desc='Satellite to sun line of sight over time')
 
+        rows = np.tile(np.repeat(0, 3), n) + np.repeat(np.arange(n), 3)
+        cols = np.tile(np.arange(3), n) + np.repeat(6*np.arange(n), 3)
+
+        self.declare_partials('LOS', 'r_e2b_I', rows=rows, cols=cols)
+
+        rows = np.tile(np.repeat(0, 3), n) + np.repeat(np.arange(n), 3)
+        cols = np.arange(n*3)
+
+        self.declare_partials('LOS', 'r_e2s_I', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
+        n = self.n
         r_e2b_I = inputs['r_e2b_I']
         r_e2s_I = inputs['r_e2s_I']
         LOS = outputs['LOS']
 
-        for i in range(self.n):
+        for i in range(n):
             r_b = r_e2b_I[i, :3]
             r_s = r_e2s_I[i, :3]
             dot = np.dot(r_b, r_s)
@@ -76,90 +87,40 @@ class Sun_LOS(ExplicitComponent):
         nj = 3*self.n
 
         Jab = np.zeros(shape=(nj, ), dtype=np.float)
-        Jib = np.zeros(shape=(nj, ), dtype=np.int)
-        Jjb = np.zeros(shape=(nj, ), dtype=np.int)
         Jas = np.zeros(shape=(nj, ), dtype=np.float)
-        Jis = np.zeros(shape=(nj, ), dtype=np.int)
-        Jjs = np.zeros(shape=(nj, ), dtype=np.int)
-
-        r_b = np.zeros(shape=(3, ), dtype=np.int)
-        r_s = np.zeros(shape=(3, ), dtype=np.int)
-        Bx = np.zeros(shape=(3, 3, ), dtype=np.int)
-        Sx = np.zeros(shape=(3, 3, ), dtype=np.int)
-        cross = np.zeros(shape=(3, ), dtype=np.int)
-        # ddist_cross = np.zeros(shape=(3, ), dtype=np.int)
-        dcross_drb = np.zeros(shape=(3, 3, ), dtype=np.int)
-        dcross_drs = np.zeros(shape=(3, 3, ), dtype=np.int)
-        dLOS_dx = np.zeros(shape=(3, ), dtype=np.int)
-        dLOS_drs = np.zeros(shape=(3, ), dtype=np.int)
-        dLOS_drb = np.zeros(shape=(3, ), dtype=np.int)
 
         for i in range(self.n):
             r_b = r_e2b_I[i, :3]
             r_s = r_e2s_I[i, :3]
-            Bx = crossMatrix(r_b)
-            Sx = crossMatrix(-r_s)
             dot = np.dot(r_b, r_s)
             cross = np.cross(r_b, r_s)
             dist = np.sqrt(np.dot(cross, cross))
 
             if dot >= 0.0:
-                dLOS_drb[:] = 0.0
-                dLOS_drs[:] = 0.0
+                continue
+
             elif dist <= self.r1:
-                dLOS_drb[:] = 0.0
-                dLOS_drs[:] = 0.0
+                continue
+
             elif dist >= self.r2:
-                dLOS_drb[:] = 0.0
-                dLOS_drs[:] = 0.0
+                continue
+
             else:
                 x = (dist-self.r1)/(self.r2-self.r1)
                 # LOS = 3*x**2 - 2*x**3
                 ddist_dcross = cross/dist
-                dcross_drb = Sx
-                dcross_drs = Bx
-                dx_ddist = 1.0/(self.r2-self.r1)
+                dcross_drb = crossMatrix(-r_s)
+                dcross_drs = crossMatrix(r_b)
+                dx_ddist = 1.0/(self.r2 - self.r1)
                 dLOS_dx = 6*x - 6*x**2
-                dLOS_drb = dLOS_dx*dx_ddist*np.dot(ddist_dcross, dcross_drb)
-                dLOS_drs = dLOS_dx*dx_ddist*np.dot(ddist_dcross, dcross_drs)
+                dLOS_drb = dLOS_dx * dx_ddist * np.dot(ddist_dcross, dcross_drb)
+                dLOS_drs = dLOS_dx * dx_ddist * np.dot(ddist_dcross, dcross_drs)
 
-            for k in range(3):
-                iJ = i*3 + k
-                Jab[iJ] = dLOS_drb[k]
-                Jib[iJ] = i
-                Jjb[iJ] = (i)*6 + k
-                Jas[iJ] = dLOS_drs[k]
-                Jis[iJ] = i
-                Jjs[iJ] = (i)*3 + k
+                Jab[i*3:i*3+3] = dLOS_drb
+                Jas[i*3:i*3+3] = dLOS_drs
 
-        self.Jb = scipy.sparse.csc_matrix((Jab, (Jib, Jjb)),
-                                          shape=(self.n, 6*self.n))
-        self.Js = scipy.sparse.csc_matrix((Jas, (Jis, Jjs)),
-                                          shape=(self.n, 3*self.n))
-        self.JbT = self.Jb.transpose()
-        self.JsT = self.Js.transpose()
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        n = self.n
-        dLOS = d_outputs['LOS']
-
-        if mode == 'fwd':
-            if 'r_e2b_I' in d_inputs:
-                r_e2b_I = d_inputs['r_e2b_I'][:].reshape((6*n), order='F')
-                dLOS += self.Jb.dot(r_e2b_I)
-
-            if 'r_e2s_I' in d_inputs:
-                r_e2s_I = d_inputs['r_e2s_I'][:].reshape((3*n), order='F')
-                dLOS += self.Js.dot(r_e2s_I)
-
-        else:
-            if 'r_e2b_I' in d_inputs:
-                d_inputs['r_e2b_I'] += self.JbT.dot(dLOS).reshape((n, 6), order='F')
-            if 'r_e2s_I' in d_inputs:
-                d_inputs['r_e2s_I'] += self.JsT.dot(dLOS).reshape((n, 3), order='F')
+        partials['LOS', 'r_e2b_I'] = Jab
+        partials['LOS', 'r_e2s_I'] = Jas
 
 
 def crossMatrix(v):
@@ -197,19 +158,40 @@ class Sun_PositionBody(ExplicitComponent):
                         desc='Position vector from Earth to Sun in body-fixed '
                              'frame over time.')
 
+        m = 3*n
+        rows = np.tile(np.repeat(0, 3), m) + np.repeat(np.arange(m), 3)
+        cols = np.arange(3*m)
+
+        self.declare_partials('r_e2s_B', 'O_BI', rows=rows, cols=cols)
+
+        row_col = np.arange(m)
+
+        self.declare_partials('r_e2s_B', 'r_e2s_I', rows=row_col, cols=row_col)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
-        outputs['r_e2s_B'] = computepositionrotd(self.n, inputs['r_e2s_I'],
-                                                 inputs['O_BI'])
+        outputs['r_e2s_B'] = np.einsum('kij,kj->ki', inputs['O_BI'], inputs['r_e2s_I'])
 
     def compute_partials(self, inputs, partials):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        self.J1, self.J2 = computepositionrotdjacobian(self.n, inputs['r_e2s_I'],
-                                                       inputs['O_BI'])
+        n = self.n
+        r_e2s_I = inputs['r_e2s_I']
+        O_BI = inputs['O_BI']
+
+        partials['r_e2s_B', 'r_e2s_I'] = O_BI.flatten()
+
+        nn = 3*n
+        dO_BI = r_e2s_I.flatten()
+        partials['r_e2s_B', 'O_BI'][:nn] = dO_BI
+        partials['r_e2s_B', 'O_BI'][nn:2*nn] = dO_BI
+        partials['r_e2s_B', 'O_BI'][2*nn:3*nn] = dO_BI
+
+        #self.J1, self.J2 = computepositionrotdjacobian(self.n, inputs['r_e2s_I'],
+                                                       #inputs['O_BI'])
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
