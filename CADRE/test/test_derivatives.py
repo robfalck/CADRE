@@ -439,60 +439,60 @@ class TestCADRE(unittest.TestCase):
         #self.prob.run_model()
         #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_ReactionWheel_Motor(self):
-        compname = 'ReactionWheel_Motor'
-        inputs = ['T_RW', 'w_B', 'w_RW']
-        outputs = ['T_m']
-        state0 = []
+    #def test_ReactionWheel_Motor(self):
+        #compname = 'ReactionWheel_Motor'
+        #inputs = ['T_RW', 'w_B', 'w_RW']
+        #outputs = ['T_m']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_ReactionWheel_Power(self):
-        compname = 'ReactionWheel_Power'
-        inputs = ['w_RW', 'T_RW']
-        outputs = ['P_RW']
-        state0 = []
+    #def test_ReactionWheel_Power(self):
+        #compname = 'ReactionWheel_Power'
+        #inputs = ['w_RW', 'T_RW']
+        #outputs = ['P_RW']
+        #state0 = []
 
-        np.random.seed(1001)
+        #np.random.seed(1001)
 
-        self.setup(compname, inputs, state0)
+        #self.setup(compname, inputs, state0)
 
-        self.prob['T_RW'] = np.random.random(self.prob['T_RW'].shape) * 1e-1
-        self.prob['w_RW'] = np.random.random(self.prob['w_RW'].shape) * 1e-1
+        #self.prob['T_RW'] = np.random.random(self.prob['T_RW'].shape) * 1e-1
+        #self.prob['w_RW'] = np.random.random(self.prob['w_RW'].shape) * 1e-1
 
-        self.prob.run_model()
-        self.compare_derivatives(inputs, outputs, rel_error=True)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs, outputs, rel_error=True)
 
-    def test_ReactionWheel_Torque(self):
-        compname = 'ReactionWheel_Torque'
-        inputs = ['T_tot']
-        outputs = ['T_RW']
-        state0 = []
+    #def test_ReactionWheel_Torque(self):
+        #compname = 'ReactionWheel_Torque'
+        #inputs = ['T_tot']
+        #outputs = ['T_RW']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_ReactionWheel_Dynamics(self):
-        compname = 'ReactionWheel_Dynamics'
-        inputs = ['w_B', 'T_RW']
-        outputs = ['w_RW']
+    #def test_ReactionWheel_Dynamics(self):
+        #compname = 'ReactionWheel_Dynamics'
+        #inputs = ['w_B', 'T_RW']
+        #outputs = ['w_RW']
 
-        # keep these at zeros
-        state0 = []  # ['w_RW0']
+        ## keep these at zeros
+        #state0 = []  # ['w_RW0']
 
-        self.setup(compname, inputs, state0)
-        self.prob.model.comp.h = 0.01
+        #self.setup(compname, inputs, state0)
+        #self.prob.model.comp.h = 0.01
 
-        shape = self.inputs_dict['w_B']['value'].shape
-        self.prob['w_B'] = np.random.random(shape) * 1e-4
-        shape = self.inputs_dict['T_RW']['value'].shape
-        self.prob['T_RW'] = np.random.random(shape) * 1e-9
+        #shape = self.inputs_dict['w_B']['value'].shape
+        #self.prob['w_B'] = np.random.random(shape) * 1e-4
+        #shape = self.inputs_dict['T_RW']['value'].shape
+        #self.prob['T_RW'] = np.random.random(shape) * 1e-9
 
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
     def test_Solar_ExposedArea(self):
         compname = 'Solar_ExposedArea'

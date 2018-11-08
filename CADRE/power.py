@@ -221,16 +221,14 @@ class Power_Total(ExplicitComponent):
                         desc='Battery power over time')
 
         row_col = np.arange(n)
-        val = np.ones(n)
 
-        self.declare_partials('P_bat', 'P_sol', rows=row_col, cols=row_col, val=val)
-        self.declare_partials('P_bat', 'P_comm', rows=row_col, cols=row_col, val=-5.0*val)
+        self.declare_partials('P_bat', 'P_sol', rows=row_col, cols=row_col, val=1.0)
+        self.declare_partials('P_bat', 'P_comm', rows=row_col, cols=row_col, val=-5.0)
 
         rows = np.tile(np.repeat(0, 3), n) + np.repeat(np.arange(n), 3)
         cols = np.arange(3*n)
-        val = -np.ones(3*n)
 
-        self.declare_partials('P_bat', 'P_RW', rows=rows, cols=cols, val=val)
+        self.declare_partials('P_bat', 'P_RW', rows=rows, cols=cols, val=-1.0)
 
     def compute(self, inputs, outputs):
         """

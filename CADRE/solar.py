@@ -27,6 +27,15 @@ class Solar_ExposedArea(ExplicitComponent):
     def __init__(self, n, raw1_file=None, raw2_file=None):
         super(Solar_ExposedArea, self).__init__()
 
+        self.n = n
+        self.raw1_file = raw1_file
+        self.raw2_file = raw2_file
+
+    def setup(self):
+        n = self.n
+        raw1_file = self.raw1_file
+        raw2_file = self.raw2_file
+
         fpath = os.path.dirname(os.path.realpath(__file__))
         if not raw1_file:
             raw1_file = fpath + '/data/Solar/Area10.txt'
@@ -36,8 +45,7 @@ class Solar_ExposedArea(ExplicitComponent):
         raw1 = np.genfromtxt(raw1_file)
         raw2 = np.loadtxt(raw2_file)
 
-        self.n = n
-        self.nc = 7
+        nc = self.nc = 7
         self.np = 12
 
         self.na = 10
@@ -72,11 +80,11 @@ class Solar_ExposedArea(ExplicitComponent):
         data = np.zeros((self.na, self.nz, self.ne, self.np * self.nc))
         flat_size = self.na * self.nz * self.ne
         for p in range(self.np):
-            for c in range(self.nc):
+            for c in range(nc):
                 data[:, :, :, counter] = \
-                    raw2[7 * p + c][119:119 + flat_size].reshape((self.na,
-                                                                  self.nz,
-                                                                  self.ne))
+                    raw2[nc * p + c][119:119 + flat_size].reshape((self.na,
+                                                                   self.nz,
+                                                                   self.ne))
                 counter += 1
 
         self.MBI = MBI(data, [angle, azimuth, elevation],
@@ -87,9 +95,6 @@ class Solar_ExposedArea(ExplicitComponent):
         self.Jfin = None
         self.Jaz = None
         self.Jel = None
-
-    def setup(self):
-        n = self.n
 
         # Inputs
         self.add_input('finAngle', 0.0, units='rad',
@@ -106,13 +111,22 @@ class Solar_ExposedArea(ExplicitComponent):
                         desc='Exposed area to sun for each solar cell over time',
                         units='m**2', lower=-5e-3, upper=1.834e-1)
 
+        self.declare_partials('exposedArea', 'finAngle')
+
+        nn = self.nc * self.np
+        rows = np.tile(np.arange(nn), n) + np.repeat(nn*np.arange(n), nn)
+        cols = np.tile(np.repeat(0, nn), n) + np.repeat(np.arange(n), nn)
+
+        self.declare_partials('exposedArea', 'azimuth', rows=rows, cols=cols)
+        self.declare_partials('exposedArea', 'elevation', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
         self.setx(inputs)
         P = self.MBI.evaluate(self.x)
-        outputs['exposedArea'] = P.reshape(self.n, 7, 12, order='F')
+        outputs['exposedArea'] = P.reshape(self.n, self.nc, self.np, order='F')
 
     def setx(self, inputs):
         """
@@ -127,19 +141,20 @@ class Solar_ExposedArea(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        self.Jfin = self.MBI.evaluate(self.x, 1).reshape(self.n, 7, 12, order='F')
-        self.Jaz = self.MBI.evaluate(self.x, 2).reshape(self.n, 7, 12, order='F')
-        self.Jel = self.MBI.evaluate(self.x, 3).reshape(self.n, 7, 12, order='F')
+        self.Jfin = self.MBI.evaluate(self.x, 1).reshape(self.n, self.nc, self.np, order='F')
+        self.Jaz = self.MBI.evaluate(self.x, 2).reshape(self.n, self.nc, self.np, order='F')
+        self.Jel = self.MBI.evaluate(self.x, 3).reshape(self.n, self.nc, self.np, order='F')
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         """
         Matrix-vector product with the Jacobian.
         """
         n = self.n
+        nc = self.nc
         deA = d_outputs['exposedArea']
 
         if mode == 'fwd':
-            for c in range(7):
+            for c in range(nc):
                 if 'finAngle' in d_inputs:
                     deA[:, c, :] += \
                         self.Jfin[:, c, :] * d_inputs['finAngle']
@@ -150,7 +165,7 @@ class Solar_ExposedArea(ExplicitComponent):
                     deA[:, c, :] += \
                         self.Jel[:, c, :] * d_inputs['elevation'].reshape((n, 1))
         else:
-            for c in range(7):
+            for c in range(nc):
                 # incoming arg is often sparse, so check it first
                 if len(np.nonzero(d_outputs['exposedArea'][:, c, :])[0]) == 0:
                     continue
