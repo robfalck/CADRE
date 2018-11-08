@@ -44,6 +44,9 @@ class TestCadreODE(unittest.TestCase):
 
         phase.set_state_options('r_e2b_I', defect_scaler=1000, fix_initial=True, units='km')
         phase.set_state_options('v_e2b_I', defect_scaler=1000, fix_initial=True, units='km/s')
+        phase.set_state_options('SOC', defect_scaler=1, fix_initial=True, units=None)
+
+        phase.add_design_parameter('P_bat', opt=False, units='W')
 
         phase.add_objective('time', loc='final', scaler=10)
 
@@ -67,6 +70,8 @@ class TestCadreODE(unittest.TestCase):
         p['phase0.states:v_e2b_I'][:, 1] = vcirc
         p['phase0.states:v_e2b_I'][:, 2] = 0.0
 
+        p['phase0.design_parameters:P_bat'] = 2
+
         p.run_model()
         p.run_driver()
 
@@ -80,14 +85,22 @@ class TestCadreODE(unittest.TestCase):
         assert_rel_error(self, v_e2b_I[-1, :], vcirc * np.array([-np.sin(delta_trua), np.cos(delta_trua), 0]), tolerance=1.0E-9)
 
     def test_partials(self):
-        cpd = self.p.check_partials(method='cs', out_stream=None)
-        assert_check_partials(cpd)
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True)
+        assert_check_partials(cpd, atol=1.0E-5, rtol=1.0)
 
     def test_simulate(self):
         phase = self.p.model.phase0
         exp_out = phase.simulate(times=500)
-        print( exp_out.get_values('v_e2b_I'))
+
         import matplotlib.pyplot as plt
-        # plt.plot(exp_out.get_values('time'), exp_out.get_values('v_e2b_I'), 'b-')
+
+        plt.figure()
         plt.plot(exp_out.get_values('r_e2b_I')[:, 0], exp_out.get_values('r_e2b_I')[:, 1], 'b-')
+        plt.plot(phase.get_values('r_e2b_I')[:, 0], phase.get_values('r_e2b_I')[:, 1], 'ro')
+
+        plt.figure()
+        plt.plot(exp_out.get_values('time'), exp_out.get_values('SOC'), 'b-')
+        plt.plot(phase.get_values('time'), phase.get_values('SOC'), 'ro')
+
         plt.show()
