@@ -140,46 +140,6 @@ class Power_CellVoltage(ExplicitComponent):
         partials['V_sol', 'exposedArea'] = dV_dA.flatten()
         partials['V_sol', 'Isetpt'] = dV_dI.flatten()
 
-    #def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        #"""
-        #Matrix-vector product with the Jacobian.
-        #"""
-        #dV_sol = d_outputs['V_sol']
-
-        #if mode == 'fwd':
-            #if 'LOS' in d_inputs:
-                #dV_sol += self.dV_dL * d_inputs['LOS'].reshape((self.n, 1))
-
-            #if 'temperature' in d_inputs:
-                #for p in range(12):
-                    #i = 4 if p < 4 else (p % 4)
-                    #dV_sol[:, p] += self.dV_dT[:, p, i] * d_inputs['temperature'][:, i]
-
-            #if 'Isetpt' in d_inputs:
-                #dV_sol += self.dV_dI * d_inputs['Isetpt']
-
-            #if 'exposedArea' in d_inputs:
-                #for p in range(12):
-                    #dV_sol[:, p] += \
-                        #np.sum(self.dV_dA[:, :, p] * d_inputs['exposedArea'][:, :, p], 1)
-        #else:
-            #for p in range(12):
-                #i = 4 if p < 4 else (p % 4)
-
-                #if 'LOS' in d_inputs:
-                    #d_inputs['LOS'] += (self.dV_dL[:, p] * dV_sol[:, p]).T
-
-                #if 'temperature' in d_inputs:
-                    #d_inputs['temperature'][:, i] += self.dV_dT[:, p, i] * dV_sol[:, p]
-
-                #if 'Isetpt' in d_inputs:
-                    #d_inputs['Isetpt'][:, p] += self.dV_dI[:, p] * dV_sol[:, p]
-
-                #if 'exposedArea' in d_inputs:
-                    #dexposedArea = d_inputs['exposedArea']
-                    #for c in range(7):
-                        #dexposedArea[:, c, p] += self.dV_dA[:, c, p] * dV_sol[:, p]
-
 
 class Power_SolarPower(ExplicitComponent):
     """
@@ -204,39 +164,30 @@ class Power_SolarPower(ExplicitComponent):
         self.add_output('P_sol', np.zeros((n, )), units='W',
                         desc='Solar panels power over time')
 
+        rows = np.tile(np.repeat(0, 12), n) + np.repeat(np.arange(n), 12)
+        cols = np.arange(12*n)
+
+        self.declare_partials('P_sol', 'Isetpt', rows=rows, cols=cols)
+        self.declare_partials('P_sol', 'V_sol', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
         V_sol = inputs['V_sol']
         Isetpt = inputs['Isetpt']
-        P_sol = outputs['P_sol']
 
-        P_sol[:] = np.zeros((self.n, ))
-        for p in range(12):
-            P_sol += V_sol[:, p] * Isetpt[:, p]
+        outputs['P_sol'] = np.einsum('ij,ij->i', V_sol, Isetpt)
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+    def compute_partials(self, inputs, partials):
         """
-        Matrix-vector product with the Jacobian.
+        Calculate and save derivatives. (i.e., Jacobian)
         """
-        dP_sol = d_outputs['P_sol']
+        V_sol = inputs['V_sol']
+        Isetpt = inputs['Isetpt']
 
-        if mode == 'fwd':
-            if 'V_sol' in d_inputs:
-                for p in range(12):
-                    dP_sol += d_inputs['V_sol'][:, p] * inputs['Isetpt'][:, p]
-
-            if 'Isetpt' in d_inputs:
-                for p in range(12):
-                    dP_sol += d_inputs['Isetpt'][:, p] * inputs['V_sol'][:, p]
-        else:
-            for p in range(12):
-                if 'V_sol' in d_inputs:
-                    d_inputs['V_sol'][:, p] += dP_sol * inputs['Isetpt'][:, p]
-
-                if 'Isetpt' in d_inputs:
-                    d_inputs['Isetpt'][:, p] += inputs['V_sol'][:, p] * dP_sol
+        partials['P_sol', 'Isetpt'] = V_sol.flatten()
+        partials['P_sol', 'V_sol'] = Isetpt.flatten()
 
 
 class Power_Total(ExplicitComponent):
@@ -269,37 +220,20 @@ class Power_Total(ExplicitComponent):
         self.add_output('P_bat', np.zeros((n, ), order='F'), units='W',
                         desc='Battery power over time')
 
+        row_col = np.arange(n)
+        val = np.ones(n)
+
+        self.declare_partials('P_bat', 'P_sol', rows=row_col, cols=row_col, val=val)
+        self.declare_partials('P_bat', 'P_comm', rows=row_col, cols=row_col, val=-5.0*val)
+
+        rows = np.tile(np.repeat(0, 3), n) + np.repeat(np.arange(n), 3)
+        cols = np.arange(3*n)
+        val = -np.ones(3*n)
+
+        self.declare_partials('P_bat', 'P_RW', rows=rows, cols=cols, val=val)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
-        outputs['P_bat'] = inputs['P_sol'] - 5.0*inputs['P_comm'] - \
-            np.sum(inputs['P_RW'], 1) - 2.0
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dP_bat = d_outputs['P_bat']
-
-        if mode == 'fwd':
-            if 'P_sol' in d_inputs:
-                dP_bat += d_inputs['P_sol']
-
-            if 'P_comm' in d_inputs:
-                dP_bat -= 5.0 * d_inputs['P_comm']
-
-            if 'P_RW' in d_inputs:
-                for k in range(3):
-                    dP_bat -= d_inputs['P_RW'][:, k]
-
-        else:
-            if 'P_sol' in d_inputs:
-                d_inputs['P_sol'] += dP_bat[:]
-
-            if 'P_comm' in d_inputs:
-                d_inputs['P_comm'] -= 5.0 * dP_bat
-
-            if 'P_RW' in d_inputs:
-                for k in range(3):
-                    d_inputs['P_RW'][:, k] -= dP_bat
+        outputs['P_bat'] = inputs['P_sol'] - 5.0*inputs['P_comm'] - np.sum(inputs['P_RW'], 1) - 2.0

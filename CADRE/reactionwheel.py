@@ -39,6 +39,11 @@ class ReactionWheel_Motor(ExplicitComponent):
         self.add_output('T_m', np.ones((n, 3)), units='N*m',
                         desc='Torque vector of motor over time')
 
+        row_col = np.arange(3*n)
+        val = -np.ones(3*n)
+
+        self.declare_partials('T_m', 'T_RW', rows=row_col, cols=row_col, val=val)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -61,65 +66,65 @@ class ReactionWheel_Motor(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        # T_RW = inputs['T_RW']
+        n = self.n
         w_B = inputs['w_B']
         w_RW = inputs['w_RW']
 
         w_Bx = np.zeros((3, 3))
-        self.dT_dTm = np.zeros((self.n, 3, 3))
-        self.dT_dwb = np.zeros((self.n, 3, 3))
-        self.dT_dh = np.zeros((self.n, 3, 3))
+        dT_dwb = np.zeros((self.n, 3, 3))
+        dT_dh = np.zeros((self.n, 3, 3))
 
         dwx_dwb = np.zeros((3, 3, 3))
+        dwx_dwb[0, :, 0] = (0., 0., 0.)
+        dwx_dwb[1, :, 0] = (0., 0., -1.)
+        dwx_dwb[2, :, 0] = (0., 1., 0.)
+
+        dwx_dwb[0, :, 1] = (0., 0., 1.)
+        dwx_dwb[1, :, 1] = (0., 0., 0.)
+        dwx_dwb[2, :, 1] = (-1., 0., 0.)
+
+        dwx_dwb[0, :, 2] = (0., -1., 0.)
+        dwx_dwb[1, :, 2] = (1., 0., 0.)
+        dwx_dwb[2, :, 2] = (0., 0., 0.)
+
         h_RW = self.J_RW * w_RW[:]
-        for i in range(0, self.n):
+        for i in range(0, n):
             w_Bx[0, :] = (0., -w_B[i, 2], w_B[i, 1])
             w_Bx[1, :] = (w_B[i, 2], 0., -w_B[i, 0])
             w_Bx[2, :] = (-w_B[i, 1], w_B[i, 0], 0.)
 
-            dwx_dwb[0, :, 0] = (0., 0., 0.)
-            dwx_dwb[1, :, 0] = (0., 0., -1.)
-            dwx_dwb[2, :, 0] = (0., 1., 0.)
-
-            dwx_dwb[0, :, 1] = (0., 0., 1.)
-            dwx_dwb[1, :, 1] = (0., 0., 0.)
-            dwx_dwb[2, :, 1] = (-1., 0., 0.)
-
-            dwx_dwb[0, :, 2] = (0., -1., 0.)
-            dwx_dwb[1, :, 2] = (1., 0., 0.)
-            dwx_dwb[2, :, 2] = (0., 0., 0.)
-
             for k in range(0, 3):
-                self.dT_dTm[i, k, k] = -1.
-                self.dT_dwb[i, :, k] = -np.dot(dwx_dwb[:, :, k], h_RW[i, :])
-            self.dT_dh[i, :, :] = -w_Bx
+                dT_dwb[i, :, k] = -np.dot(dwx_dwb[:, :, k], h_RW[i, :])
+            dT_dh[i, :, :] = -w_Bx
 
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dT_m = d_outputs['T_m']
+        #partials['T_m', 'T_RW'] =
 
-        if mode == 'fwd':
-            for k in range(3):
-                for j in range(3):
-                    if 'T_RW' in d_inputs:
-                        dT_m[:, k] += self.dT_dTm[:, k, j] * d_inputs['T_RW'][:, j]
-                    if 'w_B' in d_inputs:
-                        dT_m[:, k] += self.dT_dwb[:, k, j] * d_inputs['w_B'][:, j]
-                    if 'w_RW' in d_inputs:
-                        dT_m[:, k] += self.dT_dh[:, k, j] * d_inputs['w_RW'][:, j] * self.J_RW
-        else:
-            for k in range(3):
-                for j in range(3):
-                    if 'T_RW' in d_inputs:
-                        d_inputs['T_RW'][:, j] += self.dT_dTm[:, k, j] * dT_m[:, k]
+    #def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        #"""
+        #Matrix-vector product with the Jacobian.
+        #"""
+        #dT_m = d_outputs['T_m']
 
-                    if 'w_B' in d_inputs:
-                        d_inputs['w_B'][:, j] += self.dT_dwb[:, k, j] * dT_m[:, k]
+        #if mode == 'fwd':
+            #for k in range(3):
+                #for j in range(3):
+                    #if 'T_RW' in d_inputs:
+                        #dT_m[:, k] += self.dT_dTm[:, k, j] * d_inputs['T_RW'][:, j]
+                    #if 'w_B' in d_inputs:
+                        #dT_m[:, k] += self.dT_dwb[:, k, j] * d_inputs['w_B'][:, j]
+                    #if 'w_RW' in d_inputs:
+                        #dT_m[:, k] += self.dT_dh[:, k, j] * d_inputs['w_RW'][:, j] * self.J_RW
+        #else:
+            #for k in range(3):
+                #for j in range(3):
+                    #if 'T_RW' in d_inputs:
+                        #d_inputs['T_RW'][:, j] += self.dT_dTm[:, k, j] * dT_m[:, k]
 
-                    if 'w_RW' in d_inputs:
-                        d_inputs['w_RW'][:, j] += self.dT_dh[:, k, j] * dT_m[:, k] * self.J_RW
+                    #if 'w_B' in d_inputs:
+                        #d_inputs['w_B'][:, j] += self.dT_dwb[:, k, j] * dT_m[:, k]
+
+                    #if 'w_RW' in d_inputs:
+                        #d_inputs['w_RW'][:, j] += self.dT_dh[:, k, j] * dT_m[:, k] * self.J_RW
 
 
 class ReactionWheel_Power(ExplicitComponent):

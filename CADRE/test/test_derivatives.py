@@ -399,45 +399,45 @@ class TestCADRE(unittest.TestCase):
         #self.prob.run_model()
         #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Power_CellVoltage(self):
-        compname = 'Power_CellVoltage'
-        inputs = ['LOS', 'temperature', 'exposedArea', 'Isetpt']
-        outputs = ['V_sol']
-        state0 = []
+    #def test_Power_CellVoltage(self):
+        #compname = 'Power_CellVoltage'
+        #inputs = ['LOS', 'temperature', 'exposedArea', 'Isetpt']
+        #outputs = ['V_sol']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
+        #self.setup(compname, inputs, state0)
 
-        shape = self.inputs_dict['temperature']['value'].shape
-        self.prob['temperature'] = np.random.random(shape) * 40 + 240
+        #shape = self.inputs_dict['temperature']['value'].shape
+        #self.prob['temperature'] = np.random.random(shape) * 40 + 240
 
-        shape = self.inputs_dict['exposedArea']['value'].shape
-        self.prob['exposedArea'] = np.random.random(shape) * 1e-4
+        #shape = self.inputs_dict['exposedArea']['value'].shape
+        #self.prob['exposedArea'] = np.random.random(shape) * 1e-4
 
-        shape = self.inputs_dict['Isetpt']['value'].shape
-        self.prob['Isetpt'] = np.random.random(shape) * 1e-2
+        #shape = self.inputs_dict['Isetpt']['value'].shape
+        #self.prob['Isetpt'] = np.random.random(shape) * 1e-2
 
-        self.prob.run_model()
-        self.compare_derivatives(inputs, outputs, rel_error=True)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs, outputs, rel_error=True)
 
-    def test_Power_SolarPower(self):
-        compname = 'Power_SolarPower'
-        inputs = ['V_sol', 'Isetpt']
-        outputs = ['P_sol']
-        state0 = []
+    #def test_Power_SolarPower(self):
+        #compname = 'Power_SolarPower'
+        #inputs = ['V_sol', 'Isetpt']
+        #outputs = ['P_sol']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
-    def test_Power_Total(self):
-        compname = 'Power_Total'
-        inputs = ['P_sol', 'P_comm', 'P_RW']
-        outputs = ['P_bat']
-        state0 = []
+    #def test_Power_Total(self):
+        #compname = 'Power_Total'
+        #inputs = ['P_sol', 'P_comm', 'P_RW']
+        #outputs = ['P_bat']
+        #state0 = []
 
-        self.setup(compname, inputs, state0)
-        self.prob.run_model()
-        self.compare_derivatives(inputs+state0, outputs)
+        #self.setup(compname, inputs, state0)
+        #self.prob.run_model()
+        #self.compare_derivatives(inputs+state0, outputs)
 
     def test_ReactionWheel_Motor(self):
         compname = 'ReactionWheel_Motor'
