@@ -145,81 +145,56 @@ class Sun_PositionBody(ExplicitComponent):
         n = self.n
 
         # Inputs
-        self.add_input('O_BI', np.zeros((n, 3, 3), order='F'), units=None,
+        self.add_input('O_BI', np.zeros((n, 3, 3)), units=None,
                        desc='Rotation matrix from the Earth-centered inertial frame '
                             'to the satellite frame.')
 
-        self.add_input('r_e2s_I', np.zeros((n, 3), order='F'), units='km',
+        self.add_input('r_e2s_I', np.zeros((n, 3)), units='km',
                        desc='Position vector from Earth to Sun in Earth-centered '
                             'inertial frame over time.')
 
         # Outputs
-        self.add_output('r_e2s_B', np.zeros((n, 3), order='F'), units='km',
+        self.add_output('r_e2s_B', np.zeros((n, 3)), units='km',
                         desc='Position vector from Earth to Sun in body-fixed '
                              'frame over time.')
 
-        m = 3*n
-        rows = np.tile(np.repeat(0, 3), m) + np.repeat(np.arange(m), 3)
-        cols = np.arange(3*m)
+
+        row = np.tile(np.repeat(0, 3), 3) + np.repeat(np.arange(3), 3)
+        col = np.tile(np.arange(3), 3)
+        rows = np.tile(row, n) + np.repeat(3*np.arange(n), 9)
+        cols = np.tile(col, n) + np.repeat(3*np.arange(n), 9)
+
+        self.declare_partials('r_e2s_B', 'r_e2s_I', rows=rows, cols=cols)
+
+        row = np.tile(np.array([0, 0, 0]), n) + np.repeat(3*np.arange(n), 3)
+        col = np.tile(np.arange(3), n) + np.repeat(9*np.arange(n), 3)
+
+        rows = np.concatenate([row, row+1, row+2])
+        cols = np.concatenate([col, col+3, col+6])
 
         self.declare_partials('r_e2s_B', 'O_BI', rows=rows, cols=cols)
-
-        row_col = np.arange(m)
-
-        self.declare_partials('r_e2s_B', 'r_e2s_I', rows=row_col, cols=row_col)
 
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
-        outputs['r_e2s_B'] = np.einsum('kij,kj->ki', inputs['O_BI'], inputs['r_e2s_I'])
+        outputs['r_e2s_B'] = np.einsum('ijk,ik->ij', inputs['O_BI'], inputs['r_e2s_I'])
 
     def compute_partials(self, inputs, partials):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
         n = self.n
-        r_e2s_I = inputs['r_e2s_I']
         O_BI = inputs['O_BI']
+        r_e2s_I = inputs['r_e2s_I']
 
         partials['r_e2s_B', 'r_e2s_I'] = O_BI.flatten()
 
         nn = 3*n
-        dO_BI = r_e2s_I.flatten()
-        partials['r_e2s_B', 'O_BI'][:nn] = dO_BI
-        partials['r_e2s_B', 'O_BI'][nn:2*nn] = dO_BI
-        partials['r_e2s_B', 'O_BI'][2*nn:3*nn] = dO_BI
-
-        #self.J1, self.J2 = computepositionrotdjacobian(self.n, inputs['r_e2s_I'],
-                                                       #inputs['O_BI'])
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dr_e2s_B = d_outputs['r_e2s_B']
-
-        if mode == 'fwd':
-            if 'O_BI' in d_inputs:
-                for k in range(3):
-                    for u in range(3):
-                        for v in range(3):
-                            dr_e2s_B[:, k] += self.J1[:, k, u, v] * d_inputs['O_BI'][:, u, v]
-            if 'r_e2s_I' in d_inputs:
-                for k in range(3):
-                    for j in range(3):
-                        dr_e2s_B[:, k] += self.J2[:, k, j] * d_inputs['r_e2s_I'][:, j]
-        else:
-            for k in range(3):
-                if 'O_BI' in d_inputs:
-                    dO_BI = d_inputs['O_BI']
-                    for u in range(3):
-                        for v in range(3):
-                            dO_BI[:, u, v] += self.J1[:, k, u, v] * dr_e2s_B[:, k]
-                if 'r_e2s_I' in d_inputs:
-                    dr_e2s_I = d_inputs['r_e2s_I']
-                    for j in range(3):
-                        dr_e2s_I[:, j] += self.J2[:, k, j] * dr_e2s_B[:, k]
+        dO_AB = r_e2s_I.flatten()
+        partials['r_e2s_B', 'O_BI'][:nn] = dO_AB
+        partials['r_e2s_B', 'O_BI'][nn:2*nn] = dO_AB
+        partials['r_e2s_B', 'O_BI'][2*nn:3*nn] = dO_AB
 
 
 class Sun_PositionECI(ExplicitComponent):
@@ -248,18 +223,22 @@ class Sun_PositionECI(ExplicitComponent):
                         desc='Position vector from Earth to Sun in Earth-centered '
                              'inertial frame over time.')
 
-        self.Ja = np.zeros(3*n)
-        self.Ji = np.zeros(3*n)
-        self.Jj = np.zeros(3*n)
+        self.declare_partials('r_e2s_I', 'LD')
+
+        rows = np.arange(n*3)
+        cols = np.tile(np.repeat(0, 3), n) + np.repeat(np.arange(n), 3)
+
+        self.declare_partials('r_e2s_I', 't', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
         """
+        n = self.n
         r_e2s_I = outputs['r_e2s_I']
 
         T = inputs['LD'] + inputs['t'][:]/3600./24.
-        for i in range(0, self.n):
+        for i in range(0, n):
             L = self.d2r*280.460 + self.d2r*0.9856474*T[i]
             g = self.d2r*357.528 + self.d2r*0.9856003*T[i]
             Lambda = L + self.d2r*1.914666*np.sin(g) + self.d2r*0.01999464*np.sin(2*g)
@@ -272,51 +251,35 @@ class Sun_PositionECI(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        T = inputs['LD'] + inputs['t'][:]/3600./24.
+        n = self.n
+        tconv = (1.0 / 3600. / 24.)
+
+        T = inputs['LD'] + inputs['t'][:] * tconv
         dr_dt = np.empty(3)
-        for i in range(0, self.n):
+
+        Ja = np.zeros(3*n)
+        dL_dt = self.d2r * 0.9856474
+        dg_dt = self.d2r * 0.9856003
+        deps_dt = -self.d2r*3.56e-7
+
+        for i in range(n):
             L = self.d2r*280.460 + self.d2r*0.9856474*T[i]
             g = self.d2r*357.528 + self.d2r*0.9856003*T[i]
             Lambda = L + self.d2r*1.914666*np.sin(g) + self.d2r*0.01999464*np.sin(2*g)
             eps = self.d2r*23.439 - self.d2r*3.56e-7*T[i]
 
-            dL_dt = self.d2r*0.9856474
-            dg_dt = self.d2r*0.9856003
             dlambda_dt = (dL_dt + self.d2r*1.914666*np.cos(g)*dg_dt +
                           self.d2r*0.01999464*np.cos(2*g)*2*dg_dt)
-            deps_dt = -self.d2r*3.56e-7
 
             dr_dt[0] = -np.sin(Lambda)*dlambda_dt
             dr_dt[1] = np.cos(Lambda)*np.cos(eps)*dlambda_dt - np.sin(Lambda)*np.sin(eps)*deps_dt
             dr_dt[2] = np.cos(Lambda)*np.sin(eps)*dlambda_dt + np.sin(Lambda)*np.cos(eps)*deps_dt
 
-            for k in range(0, 3):
-                iJ = i*3 + k
-                self.Ja[iJ] = dr_dt[k]
-                self.Ji[iJ] = iJ
-                self.Jj[iJ] = i
+            Ja[i*3:i*3+3] = dr_dt
 
-        self.J = scipy.sparse.csc_matrix((self.Ja, (self.Ji, self.Jj)),
-                                         shape=(3*self.n, self.n))
-        self.JT = self.J.transpose()
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dr_e2s_I = d_outputs['r_e2s_I']
-
-        if mode == 'fwd':
-            if 'LD' in d_inputs and 't' in d_inputs:
-                # TODO - Should split this up so we can hook one up but not the other.
-                dr_e2s_I[:] += (self.J.dot(d_inputs['LD'] +
-                                d_inputs['t']/3600./24.).reshape((self.n, 3)))
-        else:
-            r_e2s_I = dr_e2s_I[:].reshape((3*self.n))
-            if 'LD' in d_inputs:
-                d_inputs['LD'] += sum(self.JT.dot(r_e2s_I))
-            if 't' in d_inputs:
-                d_inputs['t'] += self.JT.dot(r_e2s_I)/3600.0/24.0
+        dr_e2s = Ja.flatten()
+        partials['r_e2s_I', 'LD'] = dr_e2s
+        partials['r_e2s_I', 't'] = dr_e2s * tconv
 
 
 class Sun_PositionSpherical(ExplicitComponent):
@@ -346,6 +309,13 @@ class Sun_PositionSpherical(ExplicitComponent):
                         desc='Elevation angle of the Sun in the body-fixed frame '
                              'over time.')
 
+        rows = np.tile(np.array([0, 0, 0]), n) + np.repeat(np.arange(n), 3)
+        cols = np.arange(n*3)
+
+        self.declare_partials('elevation', 'r_e2s_B', rows=rows, cols=cols)
+
+        self.declare_partials('azimuth', 'r_e2s_B', rows=rows, cols=cols)
+
     def compute(self, inputs, outputs):
         """
         Calculate outputs.
@@ -359,33 +329,9 @@ class Sun_PositionSpherical(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        self.Ja1, self.Ji1, self.Jj1, self.Ja2, self.Ji2, self.Jj2 = \
-            computepositionsphericaljacobian(self.n, 3*self.n, inputs['r_e2s_B'])
-        self.J1 = scipy.sparse.csc_matrix((self.Ja1, (self.Ji1, self.Jj1)),
-                                          shape=(self.n, 3*self.n))
-        self.J2 = scipy.sparse.csc_matrix((self.Ja2, (self.Ji2, self.Jj2)),
-                                          shape=(self.n, 3*self.n))
-        self.J1T = self.J1.transpose()
-        self.J2T = self.J2.transpose()
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
         n = self.n
 
-        if mode == 'fwd':
-            if 'r_e2s_B' in d_inputs:
-                r_e2s_B = d_inputs['r_e2s_B'].reshape((3*self.n))
-                if 'azimuth' in d_outputs:
-                    d_outputs['azimuth'] += self.J1.dot(r_e2s_B)
-                if 'elevation' in d_outputs:
-                    d_outputs['elevation'] += self.J2.dot(r_e2s_B)
-        else:
-            if 'r_e2s_B' in d_inputs:
-                if 'azimuth' in d_outputs:
-                    azimuth = d_outputs['azimuth'][:]
-                    d_inputs['r_e2s_B'] += self.J1T.dot(azimuth).reshape((n, 3))
-                if 'elevation' in d_outputs:
-                    elevation = d_outputs['elevation'][:]
-                    d_inputs['r_e2s_B'] += self.J2T.dot(elevation).reshape((n, 3))
+        Ja1, Ja2 = computepositionsphericaljacobian(n, 3*n, inputs['r_e2s_B'])
+
+        partials['azimuth', 'r_e2s_B'] = Ja1
+        partials['elevation', 'r_e2s_B'] = Ja2
