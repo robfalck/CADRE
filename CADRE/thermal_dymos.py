@@ -7,6 +7,8 @@ import numpy as np
 
 from openmdao.api import ExplicitComponent
 
+from dymos.utils.indexing import get_src_indices_by_row
+
 # constants
 m_f = 0.4
 m_b = 2.0

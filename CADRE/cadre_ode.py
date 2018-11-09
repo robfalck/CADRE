@@ -1,5 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
+import numpy as np
+
 from openmdao.api import Group, VectorMagnitudeComp
 
 from dymos import declare_state, declare_time, declare_parameter
@@ -35,7 +37,12 @@ class CadreODE(Group):
                            promotes_inputs=['rmag_e2b', 'r_e2b_I', 'v_e2b_I'])
 
         self.add_subsystem('thermal_temp_comp', ThermalTemperatureComp(num_nodes=nn),
-                           promotes_inputs=['temperature', 'exposedArea', 'cellInstd', 'LOS', 'P_comm'])
+                           promotes_inputs=['exposedArea', 'cellInstd', 'LOS', 'P_comm'])
 
         self.add_subsystem('battery_soc_comp', BatterySOCComp(num_nodes=nn),
-                           promotes_inputs=['SOC', 'P_bat', 'T_bat'])
+                           promotes_inputs=['SOC', 'P_bat'])
+
+        # Only body tempearture is needed by battery.
+        body_idx = 5*np.arange(nn) + 4
+        self.connect('thermal_temp_comp.temperature', 'battery_soc_comp.T_bat',
+                     flat_src_indices=body_idx)
