@@ -61,6 +61,7 @@ class ThermalTemperatureComp(ExplicitComponent):
         #self.options['fixed_external_vars'] = ['cellInstd']
 
         # Precompute the Panel data so that we can use the sparsity patterns.
+
         self.panel_f_i = np.empty(12, dtype=np.int)
         self.panel_m = np.empty(12)
         self.panel_cp = np.empty(12)
@@ -117,30 +118,26 @@ class ThermalTemperatureComp(ExplicitComponent):
         LOS = inputs['LOS']
         P_comm = inputs['P_comm']
 
+        # revised implementation from ThermalTemperature.f90
         alpha = alpha_c * cellInstd + alpha_r - alpha_r * cellInstd
         s_eps = np.sum(eps_c*cellInstd + eps_r - eps_r*cellInstd, 0)
 
-        # revised implementation from ThermalTemperature.f90
-        for j in range(nn):
+        fact1 = q_sol * LOS
+        fact2 = K * A_T * temperature**4
 
-            fact1 = q_sol * LOS[j]
-            fact2 = K * A_T * temperature[j, :]**4
+        s_al_ea = np.sum(alpha*exposedArea, 1) * fact1[:, np.newaxis]
 
-            s_al_ea = np.sum(alpha*exposedArea[j, :, :], 0)*fact1
+        # Panels
+        outputs['dXdt:temperature'][:] = 0.0
+        for p in range(12):
+            f_i = self.panel_f_i[p]
+            cp = self.panel_cp[p]
+            m = self.panel_m[p]
 
-            # Panels
-            f = np.zeros((5, ), dtype=temperature.dtype)
-            for p in range(12):
-                f_i = self.panel_f_i[p]
-                cp = self.panel_cp[p]
-                m = self.panel_m[p]
+            # Cells
+            outputs['dXdt:temperature'][:, f_i] += (s_al_ea[:, p] - s_eps[p]*fact2[:, f_i]) * (1.0/(m*cp))
 
-                # Cells
-                f[f_i] += (s_al_ea[p] - s_eps[p]*fact2[f_i])/(m*cp)
-
-            f[4] += 4.0 * P_comm[j] / m_b / cp_b
-
-            outputs['dXdt:temperature'][j, :] = f
+        outputs['dXdt:temperature'][:, 4] += 4.0 * P_comm / m_b / cp_b
 
     def compute_partials(self, inputs, partials):
         nn = self.options['num_nodes']
@@ -162,26 +159,25 @@ class ThermalTemperatureComp(ExplicitComponent):
         dalpha_dw = alpha_c - alpha_r
         deps_dw = eps_c - eps_r
 
-        for j in range(nn):
+        alpha_A_sum = np.sum(alpha * exposedArea, 1)
 
-            alpha_A_sum = np.sum(alpha * exposedArea[j, :, :], 0)
+        # Panels
+        for p in range(0, 12):
+            f_i = self.panel_f_i[p]
+            cp = self.panel_cp[p]
+            m = self.panel_m[p]
 
-            # Panels
-            for p in range(0, 12):
-                f_i = self.panel_f_i[p]
-                cp = self.panel_cp[p]
-                m = self.panel_m[p]
+            # Cells
+            fact = temperature[:, f_i]**3 * (1.0 / (m*cp))
+            fact3 = q_sol/(m*cp)
+            fact1 = fact3*LOS
+            fact2 = K * A_T * temperature[:, f_i] * fact
 
-                # Cells
-                fact = temperature[j, f_i]**3 / (m*cp)
-                fact3 = q_sol/(m*cp)
-                fact1 = fact3*LOS[j]
-                fact2 = K * A_T * temperature[j, f_i] * fact
-
-                d_temperature[j, f_i] -= sum_eps[p] * fact
-                d_LOS[j, f_i] += alpha_A_sum[p] * fact3
-                d_cellInstd[j, :, p] = dalpha_dw * exposedArea[j, :, p] * fact1 - deps_dw * fact2
-                d_exposedArea[j, :, p] = alpha[:, p] * fact1
+            d_temperature[:, f_i] -= sum_eps[p] * fact
+            d_LOS[:, f_i] += alpha_A_sum[:, p] * fact3
+            d_cellInstd[:, :, p] = dalpha_dw * exposedArea[:, :, p] * fact1[:, np.newaxis] - \
+                (deps_dw * fact2)[:, np.newaxis]
+            d_exposedArea[:, :, p] = np.outer(fact1, alpha[:, p])
 
         partials['dXdt:temperature', 'temperature'] = d_temperature.flatten()
         partials['dXdt:temperature', 'exposedArea'] = d_exposedArea.flatten()

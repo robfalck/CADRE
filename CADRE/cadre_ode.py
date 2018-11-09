@@ -6,6 +6,7 @@ from dymos import declare_state, declare_time, declare_parameter
 
 from .orbit_eom import OrbitEOMComp
 from .battery_dymos import BatterySOCComp
+from .thermal_dymos import ThermalTemperatureComp
 
 
 @declare_time(units='s')
@@ -13,6 +14,7 @@ from .battery_dymos import BatterySOCComp
                units='km', shape=(3,))
 @declare_state('v_e2b_I', rate_source='orbit_eom_comp.dXdt:v_e2b_I', targets=['v_e2b_I'],
                units='km/s', shape=(3,))
+@declare_state('temperature', rate_source='thermal_temp_comp.dXdt:temperature', targets=['temperature'])
 @declare_state('SOC', rate_source='battery_soc_comp.dXdt:SOC', targets=['SOC'])
 @declare_parameter('T_bat', targets=['T_bat'], units='degK')
 @declare_parameter('P_bat', targets=['P_bat'], units='W')
@@ -31,6 +33,9 @@ class CadreODE(Group):
 
         self.add_subsystem('orbit_eom_comp', OrbitEOMComp(num_nodes=nn),
                            promotes_inputs=['rmag_e2b', 'r_e2b_I', 'v_e2b_I'])
+
+        self.add_subsystem('thermal_temp_comp', ThermalTemperatureComp(num_nodes=nn),
+                           promotes_inputs=['temperature', 'exposedArea', 'cellInstd', 'LOS', 'P_comm'])
 
         self.add_subsystem('battery_soc_comp', BatterySOCComp(num_nodes=nn),
                            promotes_inputs=['SOC', 'P_bat', 'T_bat'])

@@ -13,7 +13,7 @@ from CADRE.thermal_dymos import ThermalTemperatureComp
 class TestBatteryDymos(unittest.TestCase):
 
     def test_derivatives(self):
-        nn = 50
+        nn = 5
 
         prob = Problem(model=Group())
 
@@ -37,7 +37,7 @@ class TestBatteryDymos(unittest.TestCase):
 
         prob.run_model()
 
-        J = self.prob.check_partials(method='cs')
+        J = prob.check_partials(method='cs')
         assert_check_partials(J)
 
 
