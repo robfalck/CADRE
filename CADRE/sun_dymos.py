@@ -15,6 +15,8 @@ class Sun_LOS(ExplicitComponent):
     """
     Compute the Satellite to sun line of sight.
     """
+    def initialize(self):
+        self.options.declare('num_nodes', types=(int, ))
 
     def __init__(self, n=2):
         super(Sun_LOS, self).__init__()
