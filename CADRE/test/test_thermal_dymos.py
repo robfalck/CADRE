@@ -1,4 +1,7 @@
-from __future__ import print_function
+"""
+Unit test for thermal discipline.
+"""
+from __future__ import print_function, division, absolute_import
 
 import unittest
 
@@ -10,7 +13,7 @@ from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 from CADRE.thermal_dymos import ThermalTemperatureComp
 
 
-class TestBatteryDymos(unittest.TestCase):
+class TestThermalDymos(unittest.TestCase):
 
     def test_derivatives(self):
         nn = 5
