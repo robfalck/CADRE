@@ -8,6 +8,7 @@ from dymos import declare_state, declare_time, declare_parameter
 
 from .battery_dymos import BatterySOCComp
 from .orbit_eom import OrbitEOMComp
+from .solar_dymos import SolarExposedAreaComp
 from .sun_dymos.sun_group import SunGroup
 from .thermal_dymos import ThermalTemperatureComp
 
@@ -40,6 +41,10 @@ class CadreODE(Group):
         self.add_subsystem('sun_group', SunGroup(num_nodes=nn),
                            promotes_inputs=['r_e2b_I', 'O_BI'],
                            promotes_outputs=['azimuth', 'elevation'])
+
+        self.add_subsystem('solar_comp', SolarExposedAreaComp(num_nodes=nn),
+                           promotes_inputs=['fin_angle', 'azimuth', 'elevation'],
+                           promotes_outputs=['exposedArea'])
 
         self.add_subsystem('thermal_temp_comp', ThermalTemperatureComp(num_nodes=nn),
                            promotes_inputs=['exposedArea', 'cellInstd', 'LOS', 'P_comm'])

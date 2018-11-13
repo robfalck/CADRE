@@ -1,9 +1,10 @@
 """
 Solar discipline for CADRE
 """
-
-import os
+from __future__ import print_function, division, absolute_import
 from six.moves import range
+import os
+
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -12,7 +13,7 @@ from CADRE.kinematics import fixangles
 from MBI import MBI
 
 
-class SolarExposedAreaComp(ExplicitComponent):
+class Solar_ExposedArea(ExplicitComponent):
     """
     Exposed area calculation for a given solar cell
 
@@ -23,24 +24,20 @@ class SolarExposedAreaComp(ExplicitComponent):
     e: elevation [0,180]
     LOS: line of sight with the sun [0,1]
     """
+    def initialize(self):
+        fpath = os.path.dirname(os.path.realpath(__file__))
 
-    def __init__(self, n, raw1_file=None, raw2_file=None):
-        super(Solar_ExposedArea, self).__init__()
-
-        self.n = n
-        self.raw1_file = raw1_file
-        self.raw2_file = raw2_file
+        self.options.declare('num_nodes', types=(int, ),
+                             desc="Number of time points.")
+        self.options.declare('raw1_file', fpath + '/data/Solar/Area10.txt',
+                             desc="angle, azimuth, elevation points for exposed area interpolation.")
+        self.options.declare('raw2_file', fpath + '/data/Solar/Area_all.txt',
+                             desc="exposed area at points in raw1_file for exposed area interpolation.")
 
     def setup(self):
-        n = self.n
-        raw1_file = self.raw1_file
-        raw2_file = self.raw2_file
-
-        fpath = os.path.dirname(os.path.realpath(__file__))
-        if not raw1_file:
-            raw1_file = fpath + '/data/Solar/Area10.txt'
-        if not raw2_file:
-            raw2_file = fpath + '/data/Solar/Area_all.txt'
+        nn = self.options['num_nodes']
+        raw1_file = self.options['raw1_file']
+        raw2_file = self.options['raw2_file']
 
         raw1 = np.genfromtxt(raw1_file)
         raw2 = np.loadtxt(raw2_file)
@@ -91,31 +88,28 @@ class SolarExposedAreaComp(ExplicitComponent):
                              [4, 10, 8],
                              [4, 4, 4])
 
-        self.x = np.zeros((self.n, 3))
-        self.Jfin = None
-        self.Jaz = None
-        self.Jel = None
+        self.x = np.zeros((nn, 3))
 
         # Inputs
-        self.add_input('finAngle', 0.0, units='rad',
+        self.add_input('fin_angle', 0.0, units='rad',
                        desc='Fin angle of solar panel')
 
-        self.add_input('azimuth', np.zeros((n, )), units='rad',
+        self.add_input('azimuth', np.zeros((nn, )), units='rad',
                        desc='Azimuth angle of the sun in the body-fixed frame over time')
 
-        self.add_input('elevation', np.zeros((n, )), units='rad',
+        self.add_input('elevation', np.zeros((nn, )), units='rad',
                        desc='Elevation angle of the sun in the body-fixed frame over time')
 
         # Outputs
-        self.add_output('exposedArea', np.zeros((n, self.nc, self.np)),
+        self.add_output('exposedArea', np.zeros((nn, self.nc, self.np)),
                         desc='Exposed area to sun for each solar cell over time',
                         units='m**2', lower=-5e-3, upper=1.834e-1)
 
-        self.declare_partials('exposedArea', 'finAngle')
+        self.declare_partials('exposedArea', 'fin_angle')
 
-        nn = self.nc * self.np
-        rows = np.tile(np.arange(nn), n) + np.repeat(nn*np.arange(n), nn)
-        cols = np.tile(np.repeat(0, nn), n) + np.repeat(np.arange(n), nn)
+        ncp = self.nc * self.np
+        rows = np.tile(np.arange(ncp), nn) + np.repeat(ncp*np.arange(nn), ncp)
+        cols = np.tile(np.repeat(0, ncp), nn) + np.repeat(np.arange(nn), ncp)
 
         self.declare_partials('exposedArea', 'azimuth', rows=rows, cols=cols)
         self.declare_partials('exposedArea', 'elevation', rows=rows, cols=cols)
@@ -124,16 +118,20 @@ class SolarExposedAreaComp(ExplicitComponent):
         """
         Calculate outputs.
         """
+        nn = self.options['num_nodes']
+
         self.setx(inputs)
         P = self.MBI.evaluate(self.x)
-        outputs['exposedArea'] = P.reshape(self.n, self.nc, self.np, order='F')
+        outputs['exposedArea'] = P.reshape(nn, self.nc, self.np, order='F')
 
     def setx(self, inputs):
         """
         Sets our state array
         """
-        result = fixangles(self.n, inputs['azimuth'], inputs['elevation'])
-        self.x[:, 0] = inputs['finAngle']
+        nn = self.options['num_nodes']
+
+        result = fixangles(nn, inputs['azimuth'], inputs['elevation'])
+        self.x[:, 0] = inputs['fin_angle']
         self.x[:, 1] = result[0]
         self.x[:, 2] = result[1]
 
@@ -141,11 +139,13 @@ class SolarExposedAreaComp(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        Jfin = self.MBI.evaluate(self.x, 1).reshape(self.n, self.nc, self.np, order='F')
-        Jaz = self.MBI.evaluate(self.x, 2).reshape(self.n, self.nc, self.np, order='F')
-        Jel = self.MBI.evaluate(self.x, 3).reshape(self.n, self.nc, self.np, order='F')
+        nn = self.options['num_nodes']
 
-        partials['exposedArea', 'finAngle'] = Jfin.flatten()
+        Jfin = self.MBI.evaluate(self.x, 1).reshape(nn, self.nc, self.np, order='F')
+        Jaz = self.MBI.evaluate(self.x, 2).reshape(nn, self.nc, self.np, order='F')
+        Jel = self.MBI.evaluate(self.x, 3).reshape(nn, self.nc, self.np, order='F')
+
+        partials['exposedArea', 'fin_angle'] = Jfin.flatten()
         partials['exposedArea', 'azimuth'] = Jaz.flatten()
         partials['exposedArea', 'elevation'] = Jel.flatten()
 
