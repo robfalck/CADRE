@@ -9,7 +9,7 @@ from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 
 from dymos import Phase
 
-from CADRE.cadre_ode import CadreODE
+from CADRE.cadre_orbit_ode import CadreODE
 
 GM = 398600.44
 rmag = 7000.0
@@ -84,10 +84,13 @@ class TestCadreODE(unittest.TestCase):
         assert_rel_error(self, r_e2b_I[-1, :], rmag * np.array([np.cos(delta_trua), np.sin(delta_trua), 0]), tolerance=1.0E-9)
         assert_rel_error(self, v_e2b_I[-1, :], vcirc * np.array([-np.sin(delta_trua), np.cos(delta_trua), 0]), tolerance=1.0E-9)
 
+        print(self.p.model.phase0.get_values('runit_e2b_I'))
+        print(self.p.model.phase0.get_values('O_RI'))
+
     def test_partials(self):
-        np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True)
-        assert_check_partials(cpd, atol=1.0E-5, rtol=1.0)
+        np.set_printoptions(linewidth=10000, edgeitems=1024)
+        cpd = self.p.check_partials(compact_print=False)
+        assert_check_partials(cpd, atol=1.0E-4, rtol=1.0)
 
     def test_simulate(self):
         phase = self.p.model.phase0
