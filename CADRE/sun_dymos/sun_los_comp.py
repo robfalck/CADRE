@@ -11,7 +11,9 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 
 def cross_deriv(v):
     """
-    Compute derivative across a cross product.
+    Compute derivative across a cross product of two 3 dimensional vectors.
+
+    Given c = a x b, dc_da = cross_deriv(b), and dc_db = -cross_deriv(a)
     """
     m = np.array([[0.0, -v[2], v[1]],
                   [v[2], 0.0, -v[0]],
@@ -35,7 +37,7 @@ class SunLOSComp(ExplicitComponent):
         nn = self.options['num_nodes']
 
         self.add_input('r_e2b_I', np.zeros((nn, 3)), units='km',
-                       desc='Position and velocity vectors from '
+                       desc='Position vector from '
                             'Earth to satellite in Earth-centered '
                             'inertial frame over time.')
 
@@ -85,17 +87,18 @@ class SunLOSComp(ExplicitComponent):
         """
         Calculate and save derivatives. (i.e., Jacobian)
         """
-        nj = 3 * self.options['num_nodes']
+        nn = self.options['num_nodes']
+        nj = 3 * nn
         r2 = self.options['Re']
         r1 = r2 * self.options['alpha']
 
         r_e2b_I = inputs['r_e2b_I']
         r_e2s_I = inputs['r_e2s_I']
 
-        Jab = np.zeros(shape=(nj, ), dtype=r_e2b_i.dtype)
-        Jas = np.zeros(shape=(nj, ), dtype=r_e2b_i.dtype)
+        Jab = np.zeros(shape=(nj, ), dtype=r_e2b_I.dtype)
+        Jas = np.zeros(shape=(nj, ), dtype=r_e2b_I.dtype)
 
-        for i in range(n):
+        for i in range(nn):
             r_b = r_e2b_I[i, :]
             r_s = r_e2s_I[i, :]
             dot = np.dot(r_b, r_s)

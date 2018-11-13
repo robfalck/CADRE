@@ -6,8 +6,9 @@ from openmdao.api import Group, VectorMagnitudeComp
 
 from dymos import declare_state, declare_time, declare_parameter
 
-from .orbit_eom import OrbitEOMComp
 from .battery_dymos import BatterySOCComp
+from .orbit_eom import OrbitEOMComp
+from .sun_dymos.sun_group import SunGroup
 from .thermal_dymos import ThermalTemperatureComp
 
 
@@ -35,6 +36,10 @@ class CadreODE(Group):
 
         self.add_subsystem('orbit_eom_comp', OrbitEOMComp(num_nodes=nn),
                            promotes_inputs=['rmag_e2b', 'r_e2b_I', 'v_e2b_I'])
+
+        self.add_subsystem('sun_group', SunGroup(num_nodes=nn),
+                           promotes_inputs=['r_e2b_I', 'O_BI'],
+                           promotes_outputs=['azimuth', 'elevation'])
 
         self.add_subsystem('thermal_temp_comp', ThermalTemperatureComp(num_nodes=nn),
                            promotes_inputs=['exposedArea', 'cellInstd', 'LOS', 'P_comm'])
