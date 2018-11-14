@@ -10,7 +10,7 @@ import numpy as np
 from openmdao.api import Problem
 from openmdao.utils.assert_utils import assert_check_partials
 
-from CADRE.solar_dymos import Solar_ExposedArea
+from CADRE.solar_dymos import SolarExposedAreaComp
 from CADRE.test.util import load_validation_data
 
 #
@@ -22,7 +22,7 @@ class TestSolar(unittest.TestCase):
 
     def test_SunLOSComp(self):
         prob = Problem()
-        comp = prob.model.add_subsystem('comp', Solar_ExposedArea(num_nodes=1500),
+        comp = prob.model.add_subsystem('comp', SolarExposedAreaComp(num_nodes=1500),
                                         promotes=['*'])
 
         prob.setup()
@@ -42,7 +42,7 @@ class TestSolar(unittest.TestCase):
 
     def test_SunLOSComp_derivs(self):
         prob = Problem()
-        comp = prob.model.add_subsystem('comp', Solar_ExposedArea(num_nodes=5),
+        comp = prob.model.add_subsystem('comp', SolarExposedAreaComp(num_nodes=5),
                                         promotes=['*'])
 
         prob.setup()

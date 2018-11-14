@@ -10,6 +10,7 @@ import numpy as np
 from openmdao.api import Problem
 from openmdao.utils.assert_utils import assert_check_partials
 
+from CADRE.rw_dymos.rw_group import ReactionWheelGroup
 from CADRE.rw_dymos.rw_motor import ReactionWheelMotorComp
 from CADRE.rw_dymos.rw_power import ReactionWheelPowerComp
 from CADRE.test.util import load_validation_data
@@ -61,24 +62,24 @@ class TestReactionWheel(unittest.TestCase):
             assert(np.linalg.norm(tval - prob[var]) / np.linalg.norm(tval) < 1e-3), \
                 '%s: Expected\n%s\nbut got\n%s' % (var, str(tval), str(prob[var]))
 
-    #def test_partials(self):
+    def test_partials(self):
 
-        ## this subrange has a few points in the smoothing region.
-        #idx = np.arange(108, 113)
+        prob = Problem(model = ReactionWheelGroup(num_nodes=5))
 
-        #prob = Problem(model = SunGroup(num_nodes=len(idx)))
+        prob.setup()
 
-        #prob.setup()
+        prob['rw_motor.w_RW'] = setd['w_RW'][:, :5].T
+        prob['rw_power.w_RW'] = setd['w_RW'][:, :5].T
+        prob['rw_dynamics.w_RW'] = setd['w_RW'][:, :5].T
+        prob['rw_motor.w_B'] = setd['w_B'][:, :5].T
+        prob['rw_dynamics.w_B'] = setd['w_B'][:, :5].T
+        prob['T_RW'] = setd['T_RW'][:, :5].T
 
-        #prob['t'] = setd['t'][idx].T
-        #prob['LD'] = 0.0
-        #prob['r_e2b_I'] = setd['r_e2b_I'][:3, idx].T
+        prob.run_model()
 
-        #prob.run_model()
-
-        #np.set_printoptions(linewidth=100000, edgeitems=10000)
-        #J = prob.check_partials(method='cs', compact_print=True)
-        #assert_check_partials(J, atol=3.0E-5, rtol=1.0E-2)
+        np.set_printoptions(linewidth=100000, edgeitems=10000)
+        J = prob.check_partials(method='cs', compact_print=True, step_calc='rel')
+        assert_check_partials(J, atol=3.0E-4, rtol=1.0E-3)
 
 if __name__ == "__main__":
     unittest.main()

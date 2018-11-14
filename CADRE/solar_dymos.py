@@ -13,7 +13,7 @@ from CADRE.kinematics import fixangles
 from MBI import MBI
 
 
-class Solar_ExposedArea(ExplicitComponent):
+class SolarExposedAreaComp(ExplicitComponent):
     """
     Exposed area calculation for a given solar cell
 

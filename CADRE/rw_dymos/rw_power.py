@@ -59,7 +59,6 @@ class ReactionWheelPowerComp(ExplicitComponent):
 
         w_RW = inputs['w_RW']
         T_RW = inputs['T_RW']
-        P_RW = outputs['P_RW']
 
         outputs['P_RW'] = V * ((a * w_RW + b * T_RW)**2 + I0)
 
@@ -75,7 +74,7 @@ class ReactionWheelPowerComp(ExplicitComponent):
         w_RW = inputs['w_RW']
         T_RW = inputs['T_RW']
 
-        prod = 2 * V * (a * w_RW + b * T_RW)
+        prod = 2.0 * V * (a * w_RW + b * T_RW)
         dP_dw = a * prod
         dP_dT = b * prod
 
