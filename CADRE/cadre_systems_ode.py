@@ -13,6 +13,8 @@ from CADRE.solar_dymos import SolarExposedAreaComp
 from CADRE.sun_dymos.sun_group import SunGroup
 from CADRE.thermal_dymos import ThermalTemperatureComp
 from CADRE.attitude_dymos.attitude_group import AttitudeGroup
+from CADRE.temperature_rate_collect_comp import TemperatureRateCollectComp
+from CADRE.comm_dymos import CommGroup
 
 
 @declare_time(units='s', targets=['time'])
@@ -21,12 +23,14 @@ from CADRE.attitude_dymos.attitude_group import AttitudeGroup
 @declare_parameter('w_B', targets=['w_B'], shape=(3,), units='1/s')
 @declare_parameter('wdot_B', targets=['wdot_B'], shape=(3,), units='1/s**2')
 @declare_state('w_RW', rate_source='rw_group.dXdt:w_RW', shape=(3,), targets=['w_RW'], units='rad/s')
-# @declare_state('temperature', rate_source='thermal_temp_comp.dXdt:temperature', targets=['temperature'])
+@declare_state('temperature', rate_source='temperature_rate_collect.dXdt:temperature', targets=['temperature'], units='degK', shape=(5,))
 @declare_state('SOC', rate_source='battery_soc_comp.dXdt:SOC', targets=['SOC'])
-# @declare_parameter('T_bat', targets=['T_bat'], units='degK')
+@declare_state('data', rate_source='comm_group.dXdt:data', units='Gibyte')
 @declare_parameter('LD', targets=['LD'], units='d', dynamic=False)  # Launch date, MJD
 @declare_parameter('fin_angle', targets=['fin_angle'], units='deg', dynamic=False)  # Panel fin sweep angle
 @declare_parameter('P_bat', targets=['P_bat'], units='W')
+@declare_parameter('P_comm', targets=['P_comm'], units='W')
+@declare_parameter('antAngle', targets=['antAngle'], units='rad')
 class CadreSystemsODE(Group):
 
     def initialize(self):
@@ -37,11 +41,14 @@ class CadreSystemsODE(Group):
 
         self.add_subsystem('sun_group', SunGroup(num_nodes=nn),
                            promotes_inputs=['r_e2b_I', 'O_BI', ('t', 'time'), 'LD'],
-                           promotes_outputs=['azimuth', 'elevation'])
+                           promotes_outputs=['azimuth', 'elevation', 'LOS'])
 
         self.add_subsystem('solar_comp', SolarExposedAreaComp(num_nodes=nn),
                            promotes_inputs=['fin_angle', 'azimuth', 'elevation'],
                            promotes_outputs=['exposedArea'])
+
+        self.add_subsystem('comm_group', CommGroup(num_nodes=nn),
+                           promotes_inputs=[('t', 'time'), 'r_e2b_I', 'antAngle', 'P_comm'])
 
         self.add_subsystem('rw_group', ReactionWheelGroup(num_nodes=nn),
                            promotes_inputs=['w_RW', 'w_B', 'wdot_B'],
@@ -51,9 +58,12 @@ class CadreSystemsODE(Group):
         #                    promotes_inputs=['exposedArea', 'cellInstd', 'LOS', 'P_comm'])
         #
         self.add_subsystem('battery_soc_comp', BatterySOCComp(num_nodes=nn),
-                           promotes_inputs=['SOC', 'P_bat'])
+                           promotes_inputs=['SOC', 'P_bat', 'temperature'])
         #
         # # Only body tempearture is needed by battery.
         # body_idx = 5*np.arange(nn) + 4
         # self.connect('thermal_temp_comp.temperature', 'battery_soc_comp.T_bat',
         #              flat_src_indices=body_idx)
+
+        self.add_subsystem('temperature_rate_collect', TemperatureRateCollectComp(num_nodes=nn),
+                           promotes_inputs=['dXdt:T_bat', 'dXdt:T_fins'])

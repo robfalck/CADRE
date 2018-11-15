@@ -33,7 +33,7 @@ class BatterySOCComp(ExplicitComponent):
         self.add_input('P_bat', np.zeros((nn,)), units='W',
                        desc='Battery power over time')
 
-        self.add_input('T_bat', 273.0 * np.ones((nn,)), units='degK',
+        self.add_input('temperature', 273.0 * np.ones((nn, 5)), units='degK',
                        desc='Battery temperature over time')
 
         # Outputs
@@ -43,14 +43,17 @@ class BatterySOCComp(ExplicitComponent):
         self.add_output('I_bat', np.zeros((nn,)), units='A',
                         desc='Battery current draw over time')
 
-        ar = np.arange(nn)
+        ar = np.arange(nn, dtype=int)
         self.declare_partials(of='dXdt:SOC', wrt='SOC', rows=ar, cols=ar)
         self.declare_partials(of='dXdt:SOC', wrt='P_bat', rows=ar, cols=ar)
-        self.declare_partials(of='dXdt:SOC', wrt='T_bat', rows=ar, cols=ar)
 
         self.declare_partials(of='I_bat', wrt='SOC', rows=ar, cols=ar)
         self.declare_partials(of='I_bat', wrt='P_bat', rows=ar, cols=ar)
-        self.declare_partials(of='I_bat', wrt='T_bat', rows=ar, cols=ar)
+
+        cs = np.arange(4, nn*5, 5, dtype=int)
+
+        self.declare_partials(of='I_bat', wrt='temperature', rows=ar, cols=cs)
+        self.declare_partials(of='dXdt:SOC', wrt='temperature', rows=ar, cols=cs)
 
         # self.options['state_var'] = 'SOC'
         # self.options['init_state_var'] = 'iSOC'
@@ -59,7 +62,7 @@ class BatterySOCComp(ExplicitComponent):
     def compute(self, inputs, outputs):
         SOC = inputs['SOC']
         P = inputs['P_bat']
-        T = inputs['T_bat']
+        T = inputs['temperature'][:, 4]
 
         voc = 3 + np.expm1(SOC) / (np.e - 1)
         V = IR * voc * (2.0 - np.exp(alpha*(T-T0)/T0))
@@ -71,7 +74,7 @@ class BatterySOCComp(ExplicitComponent):
     def compute_partials(self, inputs, partials):
         SOC = inputs['SOC']
         P = inputs['P_bat']
-        T = inputs['T_bat']
+        T = inputs['temperature'][:, 4]
 
         voc = 3 + np.expm1(SOC) / (np.e-1)
         dVoc_dSOC = np.exp(SOC) / (np.e-1)
@@ -91,9 +94,9 @@ class BatterySOCComp(ExplicitComponent):
 
         partials['dXdt:SOC', 'SOC'] = sigma/24 - eta/Cp*dI_dSOC
         partials['dXdt:SOC', 'P_bat'] = -eta/Cp*dI_dP
-        partials['dXdt:SOC', 'T_bat'] = -eta/Cp*dI_dT
+        partials['dXdt:SOC', 'temperature'] = -eta/Cp*dI_dT
 
         tmp2 = -P/(V**2)
-        partials['I_bat', 'T_bat'] = tmp2 * dV_dT
+        partials['I_bat', 'temperature'] = tmp2 * dV_dT
         partials['I_bat', 'SOC'] = tmp2 * dV_dvoc * dVoc_dSOC
         partials['I_bat', 'P_bat'] = 1.0 / V

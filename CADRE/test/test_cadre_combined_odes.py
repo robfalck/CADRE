@@ -102,9 +102,11 @@ class TestCadreOrbitODE(unittest.TestCase):
         systems_phase.set_time_options(fix_initial=True, fix_duration=True)
         systems_phase.set_state_options('SOC', defect_ref=1, fix_initial=True, units=None)
         systems_phase.set_state_options('w_RW', defect_ref=1000, fix_initial=True, units='1/s')
+        systems_phase.set_state_options('data', defect_ref=10, fix_initial=True, units='Gibyte')
         systems_phase.add_design_parameter('P_bat', opt=False, units='W')
         systems_phase.add_design_parameter('LD', opt=False, units='d')
         systems_phase.add_design_parameter('fin_angle', opt=False, units='deg')
+        systems_phase.add_design_parameter('antAngle', opt=False, units='deg')
 
         # Add r_e2b_I and O_BI as non-optimized controls, allowing them to be connected to external sources
         systems_phase.add_control('r_e2b_I', opt=False, units='km')
@@ -159,6 +161,7 @@ class TestCadreOrbitODE(unittest.TestCase):
 
         p['systems_phase.states:SOC'] = 1.0
         p['systems_phase.states:w_RW'] = 100.0
+        p['systems_phase.states:data'] = 0.0
 
         # p['systems_phase.states:v_e2b_I'][:, 0] = 0.0
         # p['systems_phase.states:v_e2b_I'][:, 1] = vcirc
