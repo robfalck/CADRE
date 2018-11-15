@@ -52,7 +52,7 @@ class PowerCellVoltage(ExplicitComponent):
         self.add_input('temperature', np.zeros((nn, 5)), units='degK',
                        desc='Temperature of solar cells over time')
 
-        self.add_input('exposedArea', np.zeros((nn, 7, 12)), units='m**2',
+        self.add_input('exposed_area', np.zeros((nn, 7, 12)), units='m**2',
                        desc='Exposed area to sun for each solar cell over time')
 
         self.add_input('Isetpt', np.zeros((nn, 12)), units='A',
@@ -78,7 +78,7 @@ class PowerCellVoltage(ExplicitComponent):
         rows = np.tile(row, nn) + np.repeat(12*np.arange(nn), 84)
         cols = np.arange(nn*7*12)
 
-        self.declare_partials('V_sol', 'exposedArea', rows=rows, cols=cols)
+        self.declare_partials('V_sol', 'exposed_area', rows=rows, cols=cols)
 
         row_col = np.arange(nn*12)
 
@@ -87,14 +87,14 @@ class PowerCellVoltage(ExplicitComponent):
     def setx(self, inputs):
         temperature = inputs['temperature']
         LOS = inputs['LOS']
-        exposedArea = inputs['exposedArea']
+        exposed_area = inputs['exposed_area']
         Isetpt = inputs['Isetpt']
 
         for p in range(12):
             i = 4 if p < 4 else (p % 4)
             for c in range(7):
                 self.xV[:, c, p, 0] = temperature[:, i]
-                self.xV[:, c, p, 1] = LOS * exposedArea[:, c, p]
+                self.xV[:, c, p, 1] = LOS * exposed_area[:, c, p]
                 self.xV[:, c, p, 2] = Isetpt[:, p]
 
     def compute(self, inputs, outputs):
@@ -116,7 +116,7 @@ class PowerCellVoltage(ExplicitComponent):
         """
         nn = self.options['num_nodes']
 
-        exposedArea = inputs['exposedArea']
+        exposed_area = inputs['exposed_area']
         LOS = inputs['LOS']
 
         raw1 = self.MBI.evaluate(self.x, 1)[:, 0].reshape((nn, 7, 12), order='F')
@@ -131,12 +131,12 @@ class PowerCellVoltage(ExplicitComponent):
         for p in range(12):
             i = 4 if p < 4 else (p % 4)
             for c in range(7):
-                dV_dL[:, p] += raw2[:, c, p] * exposedArea[:, c, p]
+                dV_dL[:, p] += raw2[:, c, p] * exposed_area[:, c, p]
                 dV_dT[:, p, i] += raw1[:, c, p]
                 dV_dA[:, c, p] += raw2[:, c, p] * LOS
                 dV_dI[:, p] += raw3[:, c, p]
 
         partials['V_sol', 'LOS'] = dV_dL.flatten()
         partials['V_sol', 'temperature'] = dV_dT.flatten()
-        partials['V_sol', 'exposedArea'] = dV_dA.flatten()
+        partials['V_sol', 'exposed_area'] = dV_dA.flatten()
         partials['V_sol', 'Isetpt'] = dV_dI.flatten()

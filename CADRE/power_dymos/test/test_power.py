@@ -11,6 +11,7 @@ from openmdao.api import Problem
 from openmdao.utils.assert_utils import assert_check_partials
 
 from CADRE.power_dymos.power_cell_voltage import PowerCellVoltage
+from CADRE.power_dymos.power_group import PowerGroup
 from CADRE.power_dymos.power_solar_power import PowerSolarPower
 from CADRE.power_dymos.power_total import PowerTotal
 from CADRE.test.util import load_validation_data
@@ -32,7 +33,7 @@ class TestPower(unittest.TestCase):
 
         prob['LOS'] = setd['LOS']
         prob['temperature'] = setd['temperature'].T
-        prob['exposedArea'] = np.transpose(setd['exposedArea'], [2, 0, 1])
+        prob['exposed_area'] = np.transpose(setd['exposedArea'], [2, 0, 1])
         prob['Isetpt'] = setd['Isetpt'].T
 
         prob.run_model()
@@ -83,24 +84,27 @@ class TestPower(unittest.TestCase):
             assert(np.linalg.norm(tval - prob[var]) / np.linalg.norm(tval) < 1e-3), \
                 '%s: Expected\n%s\nbut got\n%s' % (var, str(tval), str(prob[var]))
 
-    #def test_partials(self):
+    def test_partials(self):
 
-        ## this subrange has a few points in the smoothing region.
-        #idx = np.arange(108, 113)
+        prob = Problem(model = PowerGroup(num_nodes=5))
 
-        #prob = Problem(model = SunGroup(num_nodes=len(idx)))
+        prob.setup()
 
-        #prob.setup()
+        prob['LOS'] = setd['LOS'][:5]
+        prob['temperature'] = setd['temperature'][:, :5].T
+        prob['power_cell_voltage.Isetpt'] = setd['Isetpt'][:, :5].T
+        prob['power_solar_power.Isetpt'] = setd['Isetpt'][:, :5].T
+        prob['exposed_area'] = np.transpose(setd['exposedArea'][:, :, :5], [2, 0, 1])
 
-        #prob['t'] = setd['t'][idx].T
-        #prob['LD'] = 0.0
-        #prob['r_e2b_I'] = setd['r_e2b_I'][:3, idx].T
+        prob.run_model()
 
-        #prob.run_model()
+        np.set_printoptions(linewidth=100000, edgeitems=10000)
+        J = prob.check_partials(method='cs', compact_print=True, excludes=['*voltage*'])
+        assert_check_partials(J, atol=1e-6, rtol=1e-6)
 
-        #np.set_printoptions(linewidth=100000, edgeitems=10000)
-        #J = prob.check_partials(method='cs', compact_print=True)
-        #assert_check_partials(J, atol=3.0E-5, rtol=1.0E-2)
+        # large deriv, so ignore atol
+        J = prob.check_partials(method='cs', compact_print=True, includes=['*voltage*'])
+        assert_check_partials(J, atol=1e2, rtol=1e-2)
 
 if __name__ == "__main__":
     unittest.main()

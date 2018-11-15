@@ -43,7 +43,7 @@ class ThermalTemperatureComp(ExplicitComponent):
         # TODO upper and lower bounds become constraints on problem?
                         #lower=50, upper=400)
 
-        self.add_input('exposedArea', np.zeros((nn, 7, 12)), units='m**2',
+        self.add_input('exposed_area', np.zeros((nn, 7, 12)), units='m**2',
                        desc='Exposed area to the sun for each solar cell over time')
 
         self.add_input('cellInstd', np.ones((7, 12)), units=None,
@@ -61,7 +61,7 @@ class ThermalTemperatureComp(ExplicitComponent):
 
         #self.options['state_var'] = 'temperature'
         #self.options['init_state_var'] = 'T0'
-        #self.options['external_vars'] = ['exposedArea', 'LOS', 'P_comm']
+        #self.options['external_vars'] = ['exposed_area', 'LOS', 'P_comm']
         #self.options['fixed_external_vars'] = ['cellInstd']
 
         # Precompute the Panel data so that we can use the sparsity patterns.
@@ -98,7 +98,7 @@ class ThermalTemperatureComp(ExplicitComponent):
         rows = np.tile(row, nn) + np.repeat(5*np.arange(nn), 84)
         cols = np.tile(np.arange(84), nn) + np.repeat(84*np.arange(nn), 84)
 
-        self.declare_partials(of='dXdt:temperature', wrt='exposedArea', rows=rows, cols=cols)
+        self.declare_partials(of='dXdt:temperature', wrt='exposed_area', rows=rows, cols=cols)
 
         cols = np.tile(np.arange(84), nn)
 
@@ -117,7 +117,7 @@ class ThermalTemperatureComp(ExplicitComponent):
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
         temperature = inputs['temperature']
-        exposedArea = inputs['exposedArea']
+        exposed_area = inputs['exposed_area']
         cellInstd = inputs['cellInstd']
         LOS = inputs['LOS']
         P_comm = inputs['P_comm']
@@ -129,7 +129,7 @@ class ThermalTemperatureComp(ExplicitComponent):
         fact1 = q_sol * LOS
         fact2 = K * A_T * temperature**4
 
-        s_al_ea = np.sum(alpha*exposedArea, 1) * fact1[:, np.newaxis]
+        s_al_ea = np.sum(alpha*exposed_area, 1) * fact1[:, np.newaxis]
 
         # Panels
         outputs['dXdt:temperature'][:] = 0.0
@@ -146,14 +146,14 @@ class ThermalTemperatureComp(ExplicitComponent):
     def compute_partials(self, inputs, partials):
         nn = self.options['num_nodes']
         temperature = inputs['temperature']
-        exposedArea = inputs['exposedArea']
+        exposed_area = inputs['exposed_area']
         cellInstd = inputs['cellInstd']
         LOS = inputs['LOS']
         P_comm = inputs['P_comm']
 
         # revised implementation from ThermalTemperature.f90
         d_temperature = np.zeros((nn, 5), dtype=temperature.dtype)
-        d_exposedArea = np.zeros((nn, 7, 12), dtype=temperature.dtype)
+        d_exposed_area = np.zeros((nn, 7, 12), dtype=temperature.dtype)
         d_cellInstd = np.zeros((nn, 7, 12), dtype=temperature.dtype)
         d_LOS = np.zeros((nn, 5), dtype=temperature.dtype)
 
@@ -163,7 +163,7 @@ class ThermalTemperatureComp(ExplicitComponent):
         dalpha_dw = alpha_c - alpha_r
         deps_dw = eps_c - eps_r
 
-        alpha_A_sum = np.sum(alpha * exposedArea, 1)
+        alpha_A_sum = np.sum(alpha * exposed_area, 1)
 
         # Panels
         for p in range(0, 12):
@@ -179,11 +179,11 @@ class ThermalTemperatureComp(ExplicitComponent):
 
             d_temperature[:, f_i] -= sum_eps[p] * fact
             d_LOS[:, f_i] += alpha_A_sum[:, p] * fact3
-            d_cellInstd[:, :, p] = dalpha_dw * exposedArea[:, :, p] * fact1[:, np.newaxis] - \
+            d_cellInstd[:, :, p] = dalpha_dw * exposed_area[:, :, p] * fact1[:, np.newaxis] - \
                 (deps_dw * fact2)[:, np.newaxis]
-            d_exposedArea[:, :, p] = np.outer(fact1, alpha[:, p])
+            d_exposed_area[:, :, p] = np.outer(fact1, alpha[:, p])
 
         partials['dXdt:temperature', 'temperature'] = d_temperature.flatten()
-        partials['dXdt:temperature', 'exposedArea'] = d_exposedArea.flatten()
+        partials['dXdt:temperature', 'exposed_area'] = d_exposed_area.flatten()
         partials['dXdt:temperature', 'cellInstd'] = d_cellInstd.flatten()
         partials['dXdt:temperature', 'LOS'] = d_LOS.flatten()

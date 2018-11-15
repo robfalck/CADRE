@@ -103,6 +103,8 @@ class TestCadreOrbitODE(unittest.TestCase):
         systems_phase.set_state_options('SOC', defect_ref=1, fix_initial=True, units=None)
         systems_phase.set_state_options('w_RW', defect_ref=1000, fix_initial=True, units='1/s')
         systems_phase.set_state_options('data', defect_ref=10, fix_initial=True, units='Gibyte')
+        systems_phase.set_state_options('temperature', ref0=273, ref=373, defect_ref=100, fix_initial=True, units='degK')
+
         systems_phase.add_design_parameter('P_bat', opt=False, units='W')
         systems_phase.add_design_parameter('LD', opt=False, units='d')
         systems_phase.add_design_parameter('fin_angle', opt=False, units='deg')
@@ -162,6 +164,7 @@ class TestCadreOrbitODE(unittest.TestCase):
         p['systems_phase.states:SOC'] = 1.0
         p['systems_phase.states:w_RW'] = 100.0
         p['systems_phase.states:data'] = 0.0
+        p['systems_phase.states:temperature'] = 273.0
 
         # p['systems_phase.states:v_e2b_I'][:, 0] = 0.0
         # p['systems_phase.states:v_e2b_I'][:, 1] = vcirc
@@ -185,7 +188,7 @@ class TestCadreOrbitODE(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=10000, edgeitems=1024)
-        cpd = self.p.check_partials(compact_print=True)
+        cpd = self.p.check_partials(compact_print=True, out_stream=None)
         assert_check_partials(cpd, atol=1.0E-4, rtol=1.0)
 
     def test_simulate(self):

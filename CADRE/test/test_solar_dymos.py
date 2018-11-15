@@ -33,9 +33,9 @@ class TestSolar(unittest.TestCase):
 
         prob.run_model()
 
-        for var in ['exposedArea']:
+        for var in ['exposed_area']:
 
-            tval = np.transpose(setd[var], [2, 0, 1])
+            tval = np.transpose(setd['exposedArea'], [2, 0, 1])
 
             assert(np.linalg.norm(tval - prob[var]) / np.linalg.norm(tval) < 1e-3), \
                 '%s: Expected\n%s\nbut got\n%s' % (var, str(tval), str(prob[var]))

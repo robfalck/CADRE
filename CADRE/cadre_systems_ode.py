@@ -23,7 +23,7 @@ from CADRE.comm_dymos import CommGroup
 @declare_parameter('w_B', targets=['w_B'], shape=(3,), units='1/s')
 @declare_parameter('wdot_B', targets=['wdot_B'], shape=(3,), units='1/s**2')
 @declare_state('w_RW', rate_source='rw_group.dXdt:w_RW', shape=(3,), targets=['w_RW'], units='rad/s')
-@declare_state('temperature', rate_source='temperature_rate_collect.dXdt:temperature', targets=['temperature'], units='degK', shape=(5,))
+@declare_state('temperature', rate_source='thermal_temp_comp.dXdt:temperature', targets=['temperature'], units='degK', shape=(5,))
 @declare_state('SOC', rate_source='battery_soc_comp.dXdt:SOC', targets=['SOC'])
 @declare_state('data', rate_source='comm_group.dXdt:data', units='Gibyte')
 @declare_parameter('LD', targets=['LD'], units='d', dynamic=False)  # Launch date, MJD
@@ -45,25 +45,21 @@ class CadreSystemsODE(Group):
 
         self.add_subsystem('solar_comp', SolarExposedAreaComp(num_nodes=nn),
                            promotes_inputs=['fin_angle', 'azimuth', 'elevation'],
-                           promotes_outputs=['exposedArea'])
+                           promotes_outputs=['exposed_area'])
 
         self.add_subsystem('comm_group', CommGroup(num_nodes=nn),
-                           promotes_inputs=[('t', 'time'), 'r_e2b_I', 'antAngle', 'P_comm'])
+                           promotes_inputs=[('t', 'time'), 'r_e2b_I', 'antAngle', 'P_comm', 'O_BI'])
 
         self.add_subsystem('rw_group', ReactionWheelGroup(num_nodes=nn),
                            promotes_inputs=['w_RW', 'w_B', 'wdot_B'],
                            promotes_outputs=['P_RW', 'T_RW', 'T_m'])
 
-        # self.add_subsystem('thermal_temp_comp', ThermalTemperatureComp(num_nodes=nn),
-        #                    promotes_inputs=['exposedArea', 'cellInstd', 'LOS', 'P_comm'])
-        #
+        self.add_subsystem('thermal_temp_comp', ThermalTemperatureComp(num_nodes=nn),
+                           promotes_inputs=['temperature', 'exposed_area', 'cellInstd',
+                                            'LOS', 'P_comm'])
+
         self.add_subsystem('battery_soc_comp', BatterySOCComp(num_nodes=nn),
                            promotes_inputs=['SOC', 'P_bat', 'temperature'])
-        #
-        # # Only body tempearture is needed by battery.
-        # body_idx = 5*np.arange(nn) + 4
-        # self.connect('thermal_temp_comp.temperature', 'battery_soc_comp.T_bat',
-        #              flat_src_indices=body_idx)
 
-        self.add_subsystem('temperature_rate_collect', TemperatureRateCollectComp(num_nodes=nn),
-                           promotes_inputs=['dXdt:T_bat', 'dXdt:T_fins'])
+        # self.add_subsystem('temperature_rate_collect', TemperatureRateCollectComp(num_nodes=nn),
+        #                    promotes_inputs=['dXdt:T_bat', 'dXdt:T_fins'])
