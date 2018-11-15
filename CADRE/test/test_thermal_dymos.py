@@ -13,7 +13,7 @@ from CADRE.thermal_dymos import ThermalTemperatureComp
 class TestBatteryDymos(unittest.TestCase):
 
     def test_derivatives(self):
-        nn = 50
+        nn = 5
 
         prob = Problem(model=Group())
 
