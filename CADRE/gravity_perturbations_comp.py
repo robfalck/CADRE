@@ -52,20 +52,22 @@ class GravityPerturbationsComp(ExplicitComponent):
                         desc='Acceleration vectors from earth to satellite '
                              'in Earth-centered inertial frame over time')
 
-        temp = np.eye(3, dtype=int)
-        temp[:, -1] = [3, 3, 2]
-        template = np.kron(np.eye(nn, dtype=int), temp)
-        rs, cs = np.nonzero(template)
-        nonzero_template = template[rs, cs].ravel()
-        self.diag_idxs = np.where(nonzero_template <= 2)[0]
-        self.col3_idxs = np.where(nonzero_template >= 2)[0]
+        # First part of sparsity pattern: diagonal elements
+        row_col = np.arange(3*nn)
 
-        self.declare_partials(of='a_pert:J2', wrt='r_e2b_I', rows=rs, cols=cs, val=1.0)
+        # Second part is the [0, 2] and [1, 2] piece.
+        row = np.tile([0, 1], nn) + np.repeat(3*np.arange(nn), 2)
+        col = np.tile([2, 2], nn) + np.repeat(3*np.arange(nn), 2)
+
+        rs = np.concatenate([row_col, row])
+        cs = np.concatenate([row_col, col])
+
+        self.declare_partials(of='a_pert:J2', wrt='r_e2b_I', rows=rs, cols=cs)
 
         rs = np.arange(nn * 3, dtype=int)
         cs = np.repeat(np.arange(nn, dtype=int), 3)
 
-        self.declare_partials(of='a_pert:J2', wrt='rmag_e2b_I', rows=rs, cols=cs, val=1.0)
+        self.declare_partials(of='a_pert:J2', wrt='rmag_e2b_I', rows=rs, cols=cs)
 
     def compute(self, inputs, outputs):
         r = inputs['r_e2b_I']
@@ -86,6 +88,8 @@ class GravityPerturbationsComp(ExplicitComponent):
         print(outputs['a_pert:J2'])
 
     def compute_partials(self, inputs, partials):
+        nn = self.options['num_nodes']
+
         r = inputs['r_e2b_I']
         rmag = inputs['rmag_e2b_I']
 
@@ -99,7 +103,6 @@ class GravityPerturbationsComp(ExplicitComponent):
         drzor_drmag = -rz / rmag**2
         drz2or2_drmag = 2 * rzor * drzor_drmag
 
-
         a2 = -1.5 * mu * J2 * Reor**2 / rmag**3
         b2 = (1 - 5 * rz2or2[:, np.newaxis]) * r
         c2 = 2 * rz[:, np.newaxis] * zhat
@@ -112,96 +115,86 @@ class GravityPerturbationsComp(ExplicitComponent):
         db2_dr = - 5 * (drz2or2_dr * r + rz2or2[:, np.newaxis])
         dc2_dr = 2 * zhat
 
-        a2[:, np.newaxis] * (b2 + c2)
-
-        # X = da2_dr * b2 + a2 * db2_dr + \
-        #     da2_dr * c2 + a2 * dc2_dr
-
-        X = a2[:, np.newaxis] * (db2_dr + dc2_dr)
-        print('X')
-        print(X)
-        print('done')
-
-
-        # da2_dr = 0
-        # db2_dr = -5 * (drz2or2_dr * r + rz2or2[:, np.newaxis])
-        # dc2_dr = 2 * zhat
 
         partials['a_pert:J2', 'rmag_e2b_I'] = (da2_drmag[:, np.newaxis] * b2 +
                                                a2[:, np.newaxis] * db2_drmag +
                                                da2_drmag[:, np.newaxis] * c2).ravel()
 
-        for i in range(self.options['num_nodes']):
-            rvec = inputs['r_e2b_I'][i, :]
-            x = rvec[0]
-            y = rvec[1]
-            z = rvec[2]
+        db2_dr_vec = (1.0 - 5.0 * rz2or2)
+        db2_dr_z_only = -5.0 * r * 2.0 * (rz / rmag**2)[:, np.newaxis]
+        da_dr_z_only = a2[:, np.newaxis] * db2_dr_z_only
 
-            z2 = z * z
-            z3 = z2 * z
-            z4 = z3 * z
+        # add dc_dr_z_only
+        db2_dr_vec[2] += 2.0
 
-            r = sqrt(x * x + y * y + z2)
+        da_dr_vec = np.tile(a2 * db2_dr_vec, 3).reshape(3, nn).T
+        da_dr_vec[:, 2] += da_dr_z_only[:, 2]
 
-            r2 = r * r
-            r3 = r2 * r
-            r4 = r3 * r
-            r5 = r4 * r
-            r6 = r5 * r
-            r7 = r6 * r
-            r8 = r7 * r
+        partials['a_pert:J2', 'r_e2b_I'][:3*nn] = da_dr_vec.flatten()
+        partials['a_pert:J2', 'r_e2b_I'][3*nn:] = da_dr_z_only[:, :2].flatten()
 
-            dr = np.array([x, y, z]) / r
+        #for i in range(self.options['num_nodes']):
+            #rvec = inputs['r_e2b_I'][i, :]
+            #x = rvec[0]
+            #y = rvec[1]
+            #z = rvec[2]
 
-            T2 = 1 - 5 * z2 / r2
-            T3 = 3 * z - 7 * z3 / r2
-            T4 = 1 - 14 * z2 / r2 + 21 * z4 / r4
-            T3z = 3 * z - 0.6 * r2 / z
-            T4z = 4 - 28.0 / 3.0 * z2 / r2
+            #z2 = z * z
+            #z3 = z2 * z
+            #z4 = z3 * z
 
-            dT2 = (10 * z2) / (r3) * dr
-            dT2[2] -= 10. * z / r2
+            #r = sqrt(x * x + y * y + z2)
 
-            dT3 = 14 * z3 / r3 * dr
-            dT3[2] -= 21. * z2 / r2 - 3
+            #r2 = r * r
+            #r3 = r2 * r
+            #r4 = r3 * r
+            #r5 = r4 * r
+            #r6 = r5 * r
+            #r7 = r6 * r
+            #r8 = r7 * r
 
-            dT4 = (28 * z2 / r3 - 84. * z4 / r5) * dr
-            dT4[2] -= 28 * z / r2 - 84 * z3 / r4
+            #dr = np.array([x, y, z]) / r
 
-            dT3z = -1.2 * r / z * dr
-            dT3z[2] += 0.6 * r2 / z2 + 3
+            #T2 = 1 - 5 * z2 / r2
+            #T3 = 3 * z - 7 * z3 / r2
+            #T4 = 1 - 14 * z2 / r2 + 21 * z4 / r4
+            #T3z = 3 * z - 0.6 * r2 / z
+            #T4z = 4 - 28.0 / 3.0 * z2 / r2
 
-            dT4z = 56.0 / 3.0 * z2 / r3 * dr
-            dT4z[2] -= 56.0 / 3.0 * z / r2
+            #dT2 = (10 * z2) / (r3) * dr
+            #dT2[2] -= 10. * z / r2
 
-            eye = np.identity(3)
+            #dT3 = 14 * z3 / r3 * dr
+            #dT3[2] -= 21. * z2 / r2 - 3
 
-            dfdy = np.zeros((3, 3))
+            #dT4 = (28 * z2 / r3 - 84. * z4 / r5) * dr
+            #dT4[2] -= 28 * z / r2 - 84 * z3 / r4
 
-            dfdy[:, :] += eye * (C1 / r3 + C2 / r5 * T2 + C3 / r7 * T3 + C4 / r7 * T4)
-            fact = (-3 * C1 / r4 - 5 * C2 / r6 * T2 - 7 * C3 / r8 * T3 - 7 * C4 / r8 * T4)
-            dfdy[:, 0] += dr[0] * rvec * fact
-            dfdy[:, 1] += dr[1] * rvec * fact
-            dfdy[:, 2] += dr[2] * rvec * fact
-            dfdy[:, 0] += rvec * (C2 / r5 * dT2[0] + C3 / r7 * dT3[0] + C4 / r7 * dT4[0])
-            dfdy[:, 1] += rvec * (C2 / r5 * dT2[1] + C3 / r7 * dT3[1] + C4 / r7 * dT4[1])
-            dfdy[:, 2] += rvec * (C2 / r5 * dT2[2] + C3 / r7 * dT3[2] + C4 / r7 * dT4[2])
-            dfdy[2, :] += dr * z * (-5 * C2 / r6 * 2 - 7 * C3 / r8 * T3z - 7 * C4 / r8 * T4z)
-            dfdy[2, :] += z * (C3 / r7 * dT3z + C4 / r7 * dT4z)
-            dfdy[2, 2] += (C2 / r5 * 2 + C3 / r7 * T3z + C4 / r7 * T4z)
+            #dT3z = -1.2 * r / z * dr
+            #dT3z[2] += 0.6 * r2 / z2 + 3
 
-            print('dfdy')
-            print(dfdy)
+            #dT4z = 56.0 / 3.0 * z2 / r3 * dr
+            #dT4z[2] -= 56.0 / 3.0 * z / r2
 
-        # partials['a_pert:J2', 'r_e2b_I'] = a2[:, np.newaxis] * db2_dr
-        # partials['a_pert:J2', 'r_e2b_I'][self.col3_idxs] += (da2_dr * c2 + a2[:, np.newaxis] * dc2_dr).ravel()
-        # print()
-        # print((da2_dr * c2 + a2[:, np.newaxis] * dc2_dr).ravel())
+            #eye = np.identity(3)
 
+            #dfdy = np.zeros((3, 3))
 
-        # a2[:, np.newaxis] * (b2 + c2)
+            #dfdy[:, :] += eye * (C1 / r3 + C2 / r5 * T2 + C3 / r7 * T3 + C4 / r7 * T4)
+            #fact = (-3 * C1 / r4 - 5 * C2 / r6 * T2 - 7 * C3 / r8 * T3 - 7 * C4 / r8 * T4)
+            #dfdy[:, 0] += dr[0] * rvec * fact
+            #dfdy[:, 1] += dr[1] * rvec * fact
+            #dfdy[:, 2] += dr[2] * rvec * fact
+            #dfdy[:, 0] += rvec * (C2 / r5 * dT2[0] + C3 / r7 * dT3[0] + C4 / r7 * dT4[0])
+            #dfdy[:, 1] += rvec * (C2 / r5 * dT2[1] + C3 / r7 * dT3[1] + C4 / r7 * dT4[1])
+            #dfdy[:, 2] += rvec * (C2 / r5 * dT2[2] + C3 / r7 * dT3[2] + C4 / r7 * dT4[2])
+            #dfdy[2, :] += dr * z * (-5 * C2 / r6 * 2 - 7 * C3 / r8 * T3z - 7 * C4 / r8 * T4z)
+            #dfdy[2, :] += z * (C3 / r7 * dT3z + C4 / r7 * dT4z)
+            #dfdy[2, 2] += (C2 / r5 * 2 + C3 / r7 * T3z + C4 / r7 * T4z)
 
-        # partials['a_pert:J2', 'r_e2b_I'] = ((1 - 5 * rz2or2[:, np.newaxis]) * np.eye(4)).ravel()
+            #print('dfdy')
+            #print(dfdy)
+
 
 
 
