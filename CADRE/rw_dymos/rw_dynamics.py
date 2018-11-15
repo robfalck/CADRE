@@ -35,7 +35,7 @@ class ReactionWheelDynamics(ExplicitComponent):
                        desc='Angular velocity vector of reaction wheel over time')
 
         # Outputs
-        self.add_output('dXdt:w_RW', np.zeros((nn, 3)), units='1/s',
+        self.add_output('dXdt:w_RW', np.zeros((nn, 3)), units='1/s**2',
                         desc='Rate of change of reaction wheel angular velocity vector over time')
 
         #self.options['state_var'] = 'w_RW'

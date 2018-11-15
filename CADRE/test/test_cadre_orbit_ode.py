@@ -9,7 +9,7 @@ from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 
 from dymos import Phase
 
-from CADRE.cadre_orbit_ode import CadreODE
+from CADRE.cadre_orbit_ode import CadreOrbitODE
 
 GM = 398600.44
 rmag = 7000.0
@@ -17,7 +17,7 @@ period = 2 * np.pi * np.sqrt(rmag ** 3 / GM)
 vcirc = np.sqrt(GM / rmag)
 duration = period / 1
 
-class TestCadreODE(unittest.TestCase):
+class TestCadreOrbitODE(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -33,7 +33,7 @@ class TestCadreODE(unittest.TestCase):
         p.driver.opt_settings['iSumm'] = 6
 
         phase = Phase('radau-ps',
-                      ode_class=CadreODE,
+                      ode_class=CadreOrbitODE,
                       num_segments=10,
                       transcription_order=7,
                       compressed=False)
@@ -58,8 +58,6 @@ class TestCadreODE(unittest.TestCase):
 
         p['phase0.t_initial'] = 0.0
         p['phase0.t_duration'] = duration
-
-        print(p['phase0.t_duration'])
 
         # print(phase.grid_data.num_nodes)
         #

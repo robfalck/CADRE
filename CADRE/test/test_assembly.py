@@ -40,6 +40,10 @@ class TestCADRE(unittest.TestCase):
             'alt',
             'iSOC'
         ]
+
+        print(setd['LD'])
+        exit(0)
+
         for inp in input_data:
 
             if inp in ['CP_Isetpt']:

@@ -26,7 +26,7 @@ from .obi_comp import OBIComp
 # @declare_parameter('T_bat', targets=['T_bat'], units='degK')
 # @declare_parameter('P_bat', targets=['P_bat'], units='W')
 @declare_parameter('Gamma', targets=['Gamma'], units='rad')
-class CadreODE(Group):
+class CadreOrbitODE(Group):
 
     def initialize(self):
         self.options.declare('num_nodes', types=(int,))
