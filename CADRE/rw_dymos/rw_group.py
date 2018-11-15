@@ -42,4 +42,3 @@ class ReactionWheelGroup(Group):
                            ReactionWheelPowerComp(num_nodes=nn),
                            promotes_inputs=['w_RW'], promotes_outputs=['P_RW'])
 
-        self.connect('rw_motor.T_m', ('rw_power.T_RW', 'rw_dynamics.T_RW'))
