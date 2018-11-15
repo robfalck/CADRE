@@ -8,6 +8,7 @@ from dymos import declare_state, declare_time, declare_parameter
 
 from CADRE.battery_dymos import BatterySOCComp
 from CADRE.orbit_eom import OrbitEOMComp
+from CADRE.power_dymos.power_group import PowerGroup
 from CADRE.rw_dymos.rw_group import ReactionWheelGroup
 from CADRE.solar_dymos import SolarExposedAreaComp
 from CADRE.sun_dymos.sun_group import SunGroup
@@ -46,14 +47,18 @@ class CadreODE(Group):
 
         self.add_subsystem('solar_comp', SolarExposedAreaComp(num_nodes=nn),
                            promotes_inputs=['fin_angle', 'azimuth', 'elevation'],
-                           promotes_outputs=['exposedArea'])
+                           promotes_outputs=['exposed_area'])
 
         self.add_subsystem('rw_group', ReactionWheelGroup(num_nodes=nn),
                            promotes_inputs=['w_RW', 'w_B', 'T_RW'],
                            promotes_outputs=['P_RW'])
 
+        self.add_subsystem('power_group', PowerGroup(num_nodes=nn),
+                           promotes_inputs=['exposed_area', 'Isetpt', 'LOS', 'P_RW', 'P_comm'],
+                           promotes_outputs=['P_bat'])
+
         self.add_subsystem('thermal_temp_comp', ThermalTemperatureComp(num_nodes=nn),
-                           promotes_inputs=['exposedArea', 'cellInstd', 'LOS', 'P_comm'])
+                           promotes_inputs=['exposed_area', 'cellInstd', 'LOS', 'P_comm'])
 
         self.add_subsystem('battery_soc_comp', BatterySOCComp(num_nodes=nn),
                            promotes_inputs=['SOC', 'P_bat'])
@@ -62,3 +67,4 @@ class CadreODE(Group):
         body_idx = 5*np.arange(nn) + 4
         self.connect('thermal_temp_comp.temperature', 'battery_soc_comp.T_bat',
                      flat_src_indices=body_idx)
+        self.connect('thermal_temp_comp.temperature', 'power_group.temperature')

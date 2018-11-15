@@ -101,18 +101,18 @@ class SolarExposedAreaComp(ExplicitComponent):
                        desc='Elevation angle of the sun in the body-fixed frame over time')
 
         # Outputs
-        self.add_output('exposedArea', np.zeros((nn, self.nc, self.np)),
+        self.add_output('exposed_area', np.zeros((nn, self.nc, self.np)),
                         desc='Exposed area to sun for each solar cell over time',
                         units='m**2', lower=-5e-3, upper=1.834e-1)
 
-        self.declare_partials('exposedArea', 'fin_angle')
+        self.declare_partials('exposed_area', 'fin_angle')
 
         ncp = self.nc * self.np
         rows = np.tile(np.arange(ncp), nn) + np.repeat(ncp*np.arange(nn), ncp)
         cols = np.tile(np.repeat(0, ncp), nn) + np.repeat(np.arange(nn), ncp)
 
-        self.declare_partials('exposedArea', 'azimuth', rows=rows, cols=cols)
-        self.declare_partials('exposedArea', 'elevation', rows=rows, cols=cols)
+        self.declare_partials('exposed_area', 'azimuth', rows=rows, cols=cols)
+        self.declare_partials('exposed_area', 'elevation', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
@@ -122,7 +122,7 @@ class SolarExposedAreaComp(ExplicitComponent):
 
         self.setx(inputs)
         P = self.MBI.evaluate(self.x)
-        outputs['exposedArea'] = P.reshape(nn, self.nc, self.np, order='F')
+        outputs['exposed_area'] = P.reshape(nn, self.nc, self.np, order='F')
 
     def setx(self, inputs):
         """
@@ -145,7 +145,7 @@ class SolarExposedAreaComp(ExplicitComponent):
         Jaz = self.MBI.evaluate(self.x, 2).reshape(nn, self.nc, self.np, order='F')
         Jel = self.MBI.evaluate(self.x, 3).reshape(nn, self.nc, self.np, order='F')
 
-        partials['exposedArea', 'fin_angle'] = Jfin.flatten()
-        partials['exposedArea', 'azimuth'] = Jaz.flatten()
-        partials['exposedArea', 'elevation'] = Jel.flatten()
+        partials['exposed_area', 'fin_angle'] = Jfin.flatten()
+        partials['exposed_area', 'azimuth'] = Jaz.flatten()
+        partials['exposed_area', 'elevation'] = Jel.flatten()
 
