@@ -12,7 +12,8 @@ class CommLOSComp(ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_nodes', types=(int,))
-        self.options.declare('Re', types=(float,), default=6378.137)
+        self.options.declare('Re', types=(float,), default=6378.137,
+                             desc="Radius of the Earth (km).")
 
     def setup(self):
         nn = self.options['num_nodes']

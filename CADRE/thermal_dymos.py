@@ -1,6 +1,8 @@
 """
 Thermal discipline for CADRE
 """
+from __future__ import print_function, division, absolute_import
+
 from six.moves import range
 
 import numpy as np
