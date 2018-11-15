@@ -32,9 +32,9 @@ class TestCadreOrbitODE(unittest.TestCase):
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = 'SNOPT'
         p.driver.options['dynamic_simul_derivs'] = True
-        p.driver.opt_settings['Major iterations limit'] = 100
-        p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-        p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+        p.driver.opt_settings['Major iterations limit'] = 1000
+        p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-4
+        p.driver.opt_settings['Major optimality tolerance'] = 1.0E-4
         p.driver.opt_settings['iSumm'] = 6
 
         NUM_SEG = 10
@@ -68,7 +68,8 @@ class TestCadreOrbitODE(unittest.TestCase):
         src_idxs = get_src_indices_by_row(control_input_nodes_idxs, shape=(3, 3))
         p.model.connect('orbit_phase.rhs_all.O_BI', 'obi_rate_interp_comp.controls:O_BI',
                         src_indices=src_idxs, flat_src_indices=True)
-        p.model.connect('orbit_phase.time.dt_dstau', 'obi_rate_interp_comp.dt_dstau')
+        p.model.connect('orbit_phase.time.dt_dstau',
+                        ('obi_rate_interp_comp.dt_dstau', 'w_B_rate_interp_comp.dt_dstau'))
 
         # Use O_BI and Odot_BI to compute the angular velocity vector
         p.model.add_subsystem('angular_velocity_comp',
@@ -84,6 +85,10 @@ class TestCadreOrbitODE(unittest.TestCase):
                                                 grid_data=orbit_phase.grid_data),
                               promotes_outputs=[('control_rates:w_B_rate', 'wdot_B')])
 
+        src_idxs = get_src_indices_by_row(control_input_nodes_idxs, shape=(3,))
+        p.model.connect('angular_velocity_comp.w_B', 'w_B_rate_interp_comp.controls:w_B',
+                        src_indices=src_idxs, flat_src_indices=True)
+
         # Now add the systems phase
         
         systems_phase = Phase('radau-ps',
@@ -95,9 +100,8 @@ class TestCadreOrbitODE(unittest.TestCase):
         p.model.add_subsystem('systems_phase', systems_phase)
 
         systems_phase.set_time_options(fix_initial=True, fix_duration=True)
-        # systems_phase.set_state_options('w_RW', defect_scaler=1000, fix_initial=True, units='1/s')
-        systems_phase.set_state_options('SOC', defect_scaler=1, fix_initial=True, units=None)
-        systems_phase.set_state_options('w_RW', defect_scaler=1, fix_initial=True, units='1/s')
+        systems_phase.set_state_options('SOC', defect_ref=1, fix_initial=True, units=None)
+        systems_phase.set_state_options('w_RW', defect_ref=1000, fix_initial=True, units='1/s')
         systems_phase.add_design_parameter('P_bat', opt=False, units='W')
         systems_phase.add_design_parameter('LD', opt=False, units='d')
         systems_phase.add_design_parameter('fin_angle', opt=False, units='deg')
