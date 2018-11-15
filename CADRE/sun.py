@@ -1,14 +1,13 @@
 """
 Sun discipline for CADRE
 """
-
 from six.moves import range
+
 import numpy as np
 import scipy.sparse
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
-from CADRE.kinematics import computepositionrotd, computepositionrotdjacobian
 from CADRE.kinematics import computepositionspherical, computepositionsphericaljacobian
 
 
