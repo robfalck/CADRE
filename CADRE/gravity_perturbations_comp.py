@@ -123,12 +123,10 @@ class GravityPerturbationsComp(ExplicitComponent):
         db2_dr_vec = (1.0 - 5.0 * rz2or2)
         db2_dr_z_only = -5.0 * r * 2.0 * (rz / rmag**2)[:, np.newaxis]
         da_dr_z_only = a2[:, np.newaxis] * db2_dr_z_only
-
-        # add dc_dr_z_only
-        db2_dr_vec[2] += 2.0
+        dc_d_z_only = 2.0
 
         da_dr_vec = np.tile(a2 * db2_dr_vec, 3).reshape(3, nn).T
-        da_dr_vec[:, 2] += da_dr_z_only[:, 2]
+        da_dr_vec[:, 2] += da_dr_z_only[:, 2] + a2 * dc_d_z_only
 
         partials['a_pert:J2', 'r_e2b_I'][:3*nn] = da_dr_vec.flatten()
         partials['a_pert:J2', 'r_e2b_I'][3*nn:] = da_dr_z_only[:, :2].flatten()
