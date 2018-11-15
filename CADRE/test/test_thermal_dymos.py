@@ -22,7 +22,7 @@ class TestThermalDymos(unittest.TestCase):
 
         ivc = prob.model.add_subsystem('ivc', IndepVarComp(), promotes_outputs=['*'])
         ivc.add_output('temperature', val=np.ones((nn, 5)))
-        ivc.add_output('exposedArea', val=np.ones((nn, 7, 12)))
+        ivc.add_output('exposed_area', val=np.ones((nn, 7, 12)))
         ivc.add_output('cellInstd', val=np.ones((7, 12)))
         ivc.add_output('LOS', val=np.ones((nn, )))
         ivc.add_output('P_comm', val=np.ones((nn, )))
@@ -33,7 +33,7 @@ class TestThermalDymos(unittest.TestCase):
         prob.setup(check=True, force_alloc_complex=True)
 
         prob['temperature'] = 273 + np.random.random((nn, 5)) * 100
-        prob['exposedArea'] = np.random.random((nn, 7, 12))
+        prob['exposed_area'] = np.random.random((nn, 7, 12))
         prob['cellInstd'] = np.random.random((7, 12))
         prob['LOS'] = np.random.random((nn, ))
         prob['P_comm'] = np.random.random((nn, ))

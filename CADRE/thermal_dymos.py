@@ -163,7 +163,7 @@ class ThermalTemperatureComp(ExplicitComponent):
         dalpha_dw = alpha_c - alpha_r
         deps_dw = eps_c - eps_r
 
-        alpha_A_sum = np.sum(alpha * eexposed_area 1)
+        alpha_A_sum = np.sum(alpha * exposed_area, 1)
 
         # Panels
         for p in range(0, 12):
