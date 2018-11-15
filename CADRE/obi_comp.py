@@ -26,11 +26,13 @@ class OBIComp(ExplicitComponent):
                         desc='Rotation matrix from rolled body-fixed to inertial '
                              'frame over time')
 
-        rows = np.tile(9*np.arange(nn), 4) + np.repeat(np.array([0, 1, 3, 4]), nn)
-        cols = np.tile(np.arange(nn), 4)
+        template = np.kron(np.eye(nn, dtype=int), np.kron(np.ones((3, 3), dtype=int), np.eye(3, dtype=int)))
+        rs, cs = template.nonzero()
+        self.declare_partials('O_BI', 'O_BR', rows=rs, cols=cs, val=1.0)
 
-        self.declare_partials('O_BI', 'O_BR', val=1.0)
-        self.declare_partials('O_BI', 'O_RI', val=1.0)
+        template = np.kron(np.eye(nn * 3, dtype=int), np.ones((3, 3), dtype=int))
+        cs, rs = template.nonzero()  # Note we're transposing the matrix at each node here
+        self.declare_partials('O_BI', 'O_RI', rows=rs, cols=cs)
 
     def compute(self, inputs, outputs):
         """
@@ -40,16 +42,10 @@ class OBIComp(ExplicitComponent):
         O_BR = inputs['O_BR']
         outputs['O_BI'] = np.matmul(O_RI, O_BR)
 
-    # def compute_partials(self, inputs, partials):
-    #     """
-    #     Calculate and save derivatives. (i.e., Jacobian)
-    #     """
-    #     nn = self.options['num_nodes']
-    #     Gamma = inputs['Gamma']
-    #
-    #     sin_gam = np.sin(Gamma)
-    #     cos_gam = np.cos(Gamma)
-    #     partials['O_BR', 'Gamma'][:nn] = -sin_gam
-    #     partials['O_BR', 'Gamma'][nn:2*nn] = cos_gam
-    #     partials['O_BR', 'Gamma'][2*nn:3*nn] = -cos_gam
-    #     partials['O_BR', 'Gamma'][3*nn:4*nn] = -sin_gam
+    def compute_partials(self, inputs, partials):
+        """
+        Calculate and save derivatives. (i.e., Jacobian)
+        """
+        nn = self.options['num_nodes']
+        partials['O_BI', 'O_BR'] = np.tile(inputs['O_RI'], 3).ravel()
+        partials['O_BI', 'O_RI'] = np.tile(np.reshape(inputs['O_BR'], (nn, 9)), 3).ravel()

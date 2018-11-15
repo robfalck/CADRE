@@ -44,9 +44,10 @@ class TestCadreODE(unittest.TestCase):
 
         phase.set_state_options('r_e2b_I', defect_scaler=1000, fix_initial=True, units='km')
         phase.set_state_options('v_e2b_I', defect_scaler=1000, fix_initial=True, units='km/s')
-        phase.set_state_options('SOC', defect_scaler=1, fix_initial=True, units=None)
+        # phase.set_state_options('SOC', defect_scaler=1, fix_initial=True, units=None)
 
-        phase.add_design_parameter('P_bat', opt=False, units='W')
+        # phase.add_design_parameter('P_bat', opt=False, units='W')
+        phase.add_design_parameter('Gamma', opt=False, units='rad')
 
         phase.add_objective('time', loc='final', scaler=10)
 
@@ -70,7 +71,8 @@ class TestCadreODE(unittest.TestCase):
         p['phase0.states:v_e2b_I'][:, 1] = vcirc
         p['phase0.states:v_e2b_I'][:, 2] = 0.0
 
-        p['phase0.design_parameters:P_bat'] = 2
+        # p['phase0.design_parameters:P_bat'] = 2.0
+        p['phase0.design_parameters:Gamma'] = 0.0
 
         p.run_model()
         p.run_driver()
@@ -78,18 +80,17 @@ class TestCadreODE(unittest.TestCase):
     def test_results(self):
         r_e2b_I = self.p.model.phase0.get_values('r_e2b_I')
         v_e2b_I = self.p.model.phase0.get_values('v_e2b_I')
-        rmag_e2b = self.p.model.phase0.get_values('rmag_e2b')
+        rmag_e2b = self.p.model.phase0.get_values('rmag_e2b_I')
         assert_rel_error(self, rmag_e2b, rmag * np.ones_like(rmag_e2b), tolerance=1.0E-9)
         delta_trua = 2 * np.pi * (duration / period)
         assert_rel_error(self, r_e2b_I[-1, :], rmag * np.array([np.cos(delta_trua), np.sin(delta_trua), 0]), tolerance=1.0E-9)
         assert_rel_error(self, v_e2b_I[-1, :], vcirc * np.array([-np.sin(delta_trua), np.cos(delta_trua), 0]), tolerance=1.0E-9)
 
-        print(self.p.model.phase0.get_values('runit_e2b_I'))
-        print(self.p.model.phase0.get_values('O_RI'))
+        print(self.p.model.phase0.get_values('O_BI'))
 
     def test_partials(self):
         np.set_printoptions(linewidth=10000, edgeitems=1024)
-        cpd = self.p.check_partials(compact_print=False)
+        cpd = self.p.check_partials(compact_print=True)
         assert_check_partials(cpd, atol=1.0E-4, rtol=1.0)
 
     def test_simulate(self):
@@ -102,8 +103,8 @@ class TestCadreODE(unittest.TestCase):
         plt.plot(exp_out.get_values('r_e2b_I')[:, 0], exp_out.get_values('r_e2b_I')[:, 1], 'b-')
         plt.plot(phase.get_values('r_e2b_I')[:, 0], phase.get_values('r_e2b_I')[:, 1], 'ro')
 
-        plt.figure()
-        plt.plot(exp_out.get_values('time'), exp_out.get_values('SOC'), 'b-')
-        plt.plot(phase.get_values('time'), phase.get_values('SOC'), 'ro')
+        # plt.figure()
+        # plt.plot(exp_out.get_values('time'), exp_out.get_values('SOC'), 'b-')
+        # plt.plot(phase.get_values('time'), phase.get_values('SOC'), 'ro')
 
         plt.show()

@@ -9,11 +9,11 @@ from openmdao.utils.assert_utils import assert_check_partials
 
 from CADRE.obi_comp import OBIComp
 
-class TestOBRComp(unittest.TestCase):
+class TestOBIComp(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        nn = 5
+        nn = 10
 
         cls.p = Problem(model=Group())
 
@@ -21,7 +21,7 @@ class TestOBRComp(unittest.TestCase):
         ivc.add_output('O_BR', val=np.ones((nn, 3, 3)))
         ivc.add_output('O_RI', val=np.ones((nn, 3, 3)))
 
-        cls.p.model.add_subsystem('obr_comp', OBIComp(num_nodes=nn),
+        cls.p.model.add_subsystem('obi_comp', OBIComp(num_nodes=nn),
                                   promotes_inputs=['*'], promotes_outputs=['*'])
 
         cls.p.setup(check=True, force_alloc_complex=True)

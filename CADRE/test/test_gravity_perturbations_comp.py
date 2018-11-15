@@ -4,10 +4,10 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Group, VectorMagnitudeComp
+from openmdao.api import Problem, IndepVarComp, Group
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 
-from CADRE.ori_comp import ORIComp
+from CADRE.gravity_perturbations_comp import GravityPerturbationsComp
 
 class TestOrbitEOM(unittest.TestCase):
 
@@ -19,17 +19,19 @@ class TestOrbitEOM(unittest.TestCase):
 
         ivc = cls.p.model.add_subsystem('ivc', IndepVarComp(), promotes_outputs=['*'])
         ivc.add_output('r_e2b_I', val=np.ones((nn, 3)))
-        ivc.add_output('v_e2b_I', val=np.ones((nn, 3)))
+        ivc.add_output('rmag_e2b_I', val=np.ones((nn)))
         # ivc.add_output('hunit_e2b_I', val=np.ones((nn, 3)))
 
-        cls.p.model.add_subsystem('ori_comp', ORIComp(num_nodes=nn),
+        cls.p.model.add_subsystem('gp_comp', GravityPerturbationsComp(num_nodes=nn),
                                   promotes_inputs=['*'], promotes_outputs=['*'])
 
         cls.p.setup(check=True, force_alloc_complex=True)
 
-        cls.p['r_e2b_I'] = np.random.rand(nn, 3)*10000
-        cls.p['v_e2b_I'] = np.random.rand(nn, 3)*10
-        # cls.p['hunit_e2b_I'] = np.random.rand(nn, 3)
+        cls.p['r_e2b_I'] = np.random.rand(nn, 3)*6000
+
+        for i in range(nn):
+            r_i = cls.p['r_e2b_I'][i, :]
+            cls.p['rmag_e2b_I'][i] = np.sqrt(np.dot(r_i, r_i))
 
         cls.p.run_model()
 
