@@ -4,10 +4,10 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Group, VectorMagnitudeComp
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.api import Problem, IndepVarComp, Group
+from openmdao.utils.assert_utils import assert_check_partials
 
-from CADRE.ori_comp import ORIComp
+from CADRE.orbit_dymos.ori_comp import ORIComp
 
 class TestOrbitEOM(unittest.TestCase):
 

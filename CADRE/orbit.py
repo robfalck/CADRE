@@ -249,3 +249,13 @@ class Orbit_Initial(ExplicitComponent):
         J['r_e2b_I0', 'Inc'] = jacs[:, 3]
         J['r_e2b_I0', 'argPerigee'] = jacs[:, 4]
         J['r_e2b_I0', 'trueAnomaly'] = jacs[:, 5]
+
+
+if __name__ == '__main__':
+
+    from openmdao.api import Problem
+
+    p = Problem(model=Orbit_Initial())
+    p.setup()
+    p.run_model()
+    p.model.list_outputs(print_arrays=True)

@@ -7,7 +7,7 @@ import numpy as np
 from openmdao.api import Problem, IndepVarComp, Group
 from openmdao.utils.assert_utils import assert_check_partials
 
-from CADRE.obr_comp import OBRComp
+from CADRE.orbit_dymos.obr_comp import OBRComp
 
 class TestOBRComp(unittest.TestCase):
 

@@ -39,6 +39,8 @@ class Power_CellVoltage(ExplicitComponent):
 
         self.MBI = MBI(V, [T, A, I], [6, 6, 15], [3, 3, 3])
 
+        self.MBI.seterr('raise')
+
         self.x = np.zeros((84 * n, 3), order='F')
         self.xV = self.x.reshape((n, 7, 12, 3), order='F')
 
