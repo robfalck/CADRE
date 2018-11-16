@@ -232,7 +232,7 @@ class ReactionWheel_Dynamics(rk4.RK4):
         self.jy[2, :] = [-external[1], external[0], 0.]
 
         # TODO: sort out unit conversion here with T_RW
-        return (-external[3:]/2.8e-5 - self.jy.dot(state))
+        return (-external[3:]/2.8e-5 + self.jy.dot(state))
 
     def df_dy(self, external, state):
 
