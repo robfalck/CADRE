@@ -10,6 +10,7 @@ from CADRE.solar_dymos import SolarExposedAreaComp
 from CADRE.sun_dymos.sun_group import SunGroup
 from CADRE.thermal_dymos import ThermalTemperatureComp
 from CADRE.comm_dymos import CommGroup
+from CADRE.power_dymos import PowerGroup
 
 
 @declare_time(units='s', targets=['time'])
@@ -22,10 +23,11 @@ from CADRE.comm_dymos import CommGroup
 @declare_state('SOC', rate_source='battery_soc_comp.dXdt:SOC', targets=['SOC'])
 @declare_state('data', rate_source='comm_group.dXdt:data', units='Gibyte')
 @declare_parameter('LD', targets=['LD'], units='d', dynamic=False)  # Launch date, MJD
-@declare_parameter('fin_angle', targets=['fin_angle'], units='deg', dynamic=False)  # Panel fin sweep angle
-@declare_parameter('P_bat', targets=['P_bat'], units='W')
+@declare_parameter('fin_angle', targets=['fin_angle'], units='rad', dynamic=False)  # Panel fin sweep angle
 @declare_parameter('P_comm', targets=['P_comm'], units='W')
 @declare_parameter('antAngle', targets=['antAngle'], units='rad')
+@declare_parameter('cellInstd', targets=['cellInstd'], units=None, shape=(7, 12), dynamic=False)
+@declare_parameter('Isetpt', targets=['Isetpt'], units='A', shape=(12,), dynamic=True)
 class CadreSystemsODE(Group):
 
     def initialize(self):
@@ -53,8 +55,10 @@ class CadreSystemsODE(Group):
                            promotes_inputs=['temperature', 'exposed_area', 'cellInstd',
                                             'LOS', 'P_comm'])
 
+        self.add_subsystem('power_group', PowerGroup(num_nodes=nn),
+                           promotes_inputs=['LOS', 'temperature', 'exposed_area', 'Isetpt',
+                                            'P_comm', 'P_RW'],
+                           promotes_outputs=['P_bat'])
+
         self.add_subsystem('battery_soc_comp', BatterySOCComp(num_nodes=nn),
                            promotes_inputs=['SOC', 'P_bat', 'temperature'])
-
-        # self.add_subsystem('temperature_rate_collect', TemperatureRateCollectComp(num_nodes=nn),
-        #                    promotes_inputs=['dXdt:T_bat', 'dXdt:T_fins'])

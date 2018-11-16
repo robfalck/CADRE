@@ -38,8 +38,6 @@ class CommGainPatternComp(ExplicitComponent):
 
         rawG_file = os.path.join(parent_path, 'data/Comm/Gain.txt')
 
-        print(rawG_file)
-
         self.options.declare('num_nodes', types=(int,))
         self.options.declare('rawG_file', types=(str,), default=rawG_file)
 
@@ -55,6 +53,8 @@ class CommGainPatternComp(ExplicitComponent):
         el = np.linspace(0, 2 * pi, 361)
 
         self.MBI = MBI(rawG, [az, el], [15, 15], [4, 4])
+        self.MBI.seterr('raise')
+
         self.x = np.zeros((nn, 2), order='F')
 
         # Inputs

@@ -91,6 +91,8 @@ class Solar_ExposedArea(ExplicitComponent):
                              [4, 10, 8],
                              [4, 4, 4])
 
+        self.MBI.seterr('raise')
+
         self.x = np.zeros((self.n, 3))
         self.Jfin = None
         self.Jaz = None

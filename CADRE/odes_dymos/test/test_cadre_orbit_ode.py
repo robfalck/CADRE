@@ -4,12 +4,12 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Group, DirectSolver, pyOptSparseDriver
+from openmdao.api import Problem, Group, pyOptSparseDriver
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 
 from dymos import Phase
 
-from CADRE.cadre_orbit_ode import CadreOrbitODE
+from CADRE.odes_dymos.cadre_orbit_ode import CadreOrbitODE
 
 GM = 398600.44
 rmag = 7000.0

@@ -4,17 +4,16 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, Group, DirectSolver, pyOptSparseDriver
+from openmdao.api import Problem, Group, pyOptSparseDriver
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 
 from dymos import Phase
 from dymos.utils.indexing import get_src_indices_by_row
 from dymos.phases.components import ControlInterpComp
 
-from CADRE.cadre_orbit_ode import CadreOrbitODE
-from CADRE.cadre_attitude_ode import CadreAttitudeODE
+from CADRE.odes_dymos.cadre_orbit_ode import CadreOrbitODE
 from CADRE.attitude_dymos.angular_velocity_comp import AngularVelocityComp
-from CADRE.cadre_systems_ode import CadreSystemsODE
+from CADRE.odes_dymos.cadre_systems_ode import CadreSystemsODE
 
 GM = 398600.44
 rmag = 7000.0
@@ -29,13 +28,13 @@ class TestCadreOrbitODE(unittest.TestCase):
 
         p = cls.p = Problem(model=Group())
 
-        p.driver = pyOptSparseDriver()
-        p.driver.options['optimizer'] = 'SNOPT'
-        p.driver.options['dynamic_simul_derivs'] = True
-        p.driver.opt_settings['Major iterations limit'] = 1000
-        p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-4
-        p.driver.opt_settings['Major optimality tolerance'] = 1.0E-4
-        p.driver.opt_settings['iSumm'] = 6
+        # p.driver = pyOptSparseDriver()
+        # p.driver.options['optimizer'] = 'SNOPT'
+        # p.driver.options['dynamic_simul_derivs'] = True
+        # p.driver.opt_settings['Major iterations limit'] = 1000
+        # p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-4
+        # p.driver.opt_settings['Major optimality tolerance'] = 1.0E-4
+        # p.driver.opt_settings['iSumm'] = 6
 
         NUM_SEG = 10
         TRANSCRIPTION_ORDER = 7
@@ -101,21 +100,22 @@ class TestCadreOrbitODE(unittest.TestCase):
 
         systems_phase.set_time_options(fix_initial=True, fix_duration=True)
         systems_phase.set_state_options('SOC', defect_ref=1, fix_initial=True, units=None)
-        systems_phase.set_state_options('w_RW', defect_ref=1000, fix_initial=True, units='1/s')
+        systems_phase.set_state_options('w_RW', defect_ref=100, fix_initial=True, units='1/s')
         systems_phase.set_state_options('data', defect_ref=10, fix_initial=True, units='Gibyte')
         systems_phase.set_state_options('temperature', ref0=273, ref=373, defect_ref=100, fix_initial=True, units='degK')
 
-        systems_phase.add_design_parameter('P_bat', opt=False, units='W')
         systems_phase.add_design_parameter('LD', opt=False, units='d')
-        systems_phase.add_design_parameter('fin_angle', opt=False, units='deg')
-        systems_phase.add_design_parameter('antAngle', opt=False, units='deg')
+        systems_phase.add_design_parameter('fin_angle', opt=False, lower=0., upper=np.pi / 2.)
+        systems_phase.add_design_parameter('antAngle', opt=False, lower=-np.pi / 4, upper=np.pi / 4)
+        systems_phase.add_design_parameter('cellInstd', opt=False, lower=0.0, upper=1.0, ref=1.0)
 
         # Add r_e2b_I and O_BI as non-optimized controls, allowing them to be connected to external sources
         systems_phase.add_control('r_e2b_I', opt=False, units='km')
         systems_phase.add_control('O_BI', opt=False)
         systems_phase.add_control('w_B', opt=False)
         systems_phase.add_control('wdot_B', opt=False)
-        systems_phase.add_control('P_comm', lower=0.0, upper=10.0, units='W')
+        systems_phase.add_control('P_comm', opt=False, lower=0.0, upper=30.0, units='W')
+        systems_phase.add_control('Isetpt', opt=False, lower=0.0, upper=0.4, units='A')
 
         # Connect r_e2b_I and O_BI values from all nodes in the orbit phase to the input values
         # in the attitude phase.
@@ -145,13 +145,17 @@ class TestCadreOrbitODE(unittest.TestCase):
         # p['systems_phase.states:w_RW'][:, 1] = 0.0
         # p['systems_phase.states:w_RW'][:, 2] = 0.0
 
-        p['orbit_phase.states:r_e2b_I'][:, 0] = rmag
-        p['orbit_phase.states:r_e2b_I'][:, 1] = 0.0
-        p['orbit_phase.states:r_e2b_I'][:, 2] = 0.0
+        # Default starting orbit
+        # [ 2.89078958e+03  5.69493134e+03 -2.55340189e+03  2.56640460e-01
+        #               3.00387409e+00  6.99018448e+00]
 
-        p['orbit_phase.states:v_e2b_I'][:, 0] = 0.0
-        p['orbit_phase.states:v_e2b_I'][:, 1] = vcirc
-        p['orbit_phase.states:v_e2b_I'][:, 2] = 0.0
+        p['orbit_phase.states:r_e2b_I'][:, 0] = 2.89078958e+03
+        p['orbit_phase.states:r_e2b_I'][:, 1] = 5.69493134e+03
+        p['orbit_phase.states:r_e2b_I'][:, 2] = -2.55340189e+03
+
+        p['orbit_phase.states:v_e2b_I'][:, 0] = 2.56640460e-01
+        p['orbit_phase.states:v_e2b_I'][:, 1] = 3.00387409e+00
+        p['orbit_phase.states:v_e2b_I'][:, 2] = 6.99018448e+00
 
         # Initialize values in the systems phase
 
@@ -170,13 +174,12 @@ class TestCadreOrbitODE(unittest.TestCase):
         # p['systems_phase.states:v_e2b_I'][:, 0] = 0.0
         # p['systems_phase.states:v_e2b_I'][:, 1] = vcirc
         # p['systems_phase.states:v_e2b_I'][:, 2] = 0.0
-        #
-        p['systems_phase.design_parameters:P_bat'] = 2.0
+
         p['systems_phase.design_parameters:LD'] = 5233.5
         p['systems_phase.design_parameters:fin_angle'] = 70.0
 
         p.run_model()
-        p.run_driver()
+        # p.run_driver()
 
     def test_results(self):
         r_e2b_I = self.p.model.orbit_phase.get_values('r_e2b_I')
@@ -187,23 +190,27 @@ class TestCadreOrbitODE(unittest.TestCase):
         assert_rel_error(self, r_e2b_I[-1, :], rmag * np.array([np.cos(delta_trua), np.sin(delta_trua), 0]), tolerance=1.0E-9)
         assert_rel_error(self, v_e2b_I[-1, :], vcirc * np.array([-np.sin(delta_trua), np.cos(delta_trua), 0]), tolerance=1.0E-9)
 
-    def test_partials(self):
-        np.set_printoptions(linewidth=10000, edgeitems=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
-        assert_check_partials(cpd, atol=1.0E-4, rtol=1.0)
+    # def test_partials(self):
+    #     np.set_printoptions(linewidth=10000, edgeitems=1024)
+    #     cpd = self.p.check_partials(compact_print=True, out_stream=None)
+    #     assert_check_partials(cpd, atol=1.0E-4, rtol=1.0)
+    #
+    # def test_simulate(self):
+    #     phase = self.p.model.orbit_phase
+    #     exp_out = phase.simulate(times=500)
+    #
+    #     import matplotlib.pyplot as plt
+    #
+    #     plt.figure()
+    #     plt.plot(exp_out.get_values('r_e2b_I')[:, 0], exp_out.get_values('r_e2b_I')[:, 1], 'b-')
+    #     plt.plot(phase.get_values('r_e2b_I')[:, 0], phase.get_values('r_e2b_I')[:, 1], 'ro')
+    #
+    #     # plt.figure()
+    #     # plt.plot(exp_out.get_values('time'), exp_out.get_values('SOC'), 'b-')
+    #     # plt.plot(phase.get_values('time'), phase.get_values('SOC'), 'ro')
+    #
+    #     plt.show()
 
-    def test_simulate(self):
-        phase = self.p.model.orbit_phase
-        exp_out = phase.simulate(times=500)
 
-        import matplotlib.pyplot as plt
-
-        plt.figure()
-        plt.plot(exp_out.get_values('r_e2b_I')[:, 0], exp_out.get_values('r_e2b_I')[:, 1], 'b-')
-        plt.plot(phase.get_values('r_e2b_I')[:, 0], phase.get_values('r_e2b_I')[:, 1], 'ro')
-
-        # plt.figure()
-        # plt.plot(exp_out.get_values('time'), exp_out.get_values('SOC'), 'b-')
-        # plt.plot(phase.get_values('time'), phase.get_values('SOC'), 'ro')
-
-        plt.show()
+if __name__ == '__main__':
+    unittest.main()

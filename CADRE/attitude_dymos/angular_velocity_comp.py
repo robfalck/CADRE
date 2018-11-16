@@ -21,7 +21,7 @@ class AngularVelocityComp(ExplicitComponent):
                        desc='Rotation matrix from body-fixed frame to Earth-centered '
                        'inertial frame over time')
 
-        self.add_input('Odot_BI', np.zeros((nn, 3, 3)), units=None,
+        self.add_input('Odot_BI', np.zeros((nn, 3, 3)), units='1/s',
                        desc='First derivative of O_BI over time')
 
         # Outputs

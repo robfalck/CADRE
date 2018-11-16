@@ -582,6 +582,7 @@ class Comm_GainPattern(ExplicitComponent):
         el = np.linspace(0, 2 * pi, 361)
 
         self.MBI = MBI(rawG, [az, el], [15, 15], [4, 4])
+        self.MBI.seterr('raise')
         self.x = np.zeros((self.n, 2), order='F')
 
     def setup(self):
