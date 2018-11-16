@@ -5,6 +5,7 @@ from openmdao.api import Group, VectorMagnitudeComp
 from dymos import declare_state, declare_time, declare_parameter
 
 from CADRE.orbit_dymos.orbit_eom import OrbitEOMComp
+from CADRE.orbit_dymos.gravity_perturbations_comp import GravityPerturbationsComp
 from CADRE.orbit_dymos.ori_comp import ORIComp
 from CADRE.orbit_dymos.obr_comp import OBRComp
 from CADRE.orbit_dymos.obi_comp import OBIComp
@@ -29,6 +30,10 @@ class CadreOrbitODE(Group):
                                                mag_name='rmag_e2b_I', units='km'),
                            promotes_inputs=['r_e2b_I'], promotes_outputs=['rmag_e2b_I'])
 
+        self.add_subsystem('grav_pert_comp', GravityPerturbationsComp(num_nodes=nn),
+                           promotes_inputs=['r_e2b_I', 'rmag_e2b_I'],
+                           promotes_outputs=[('a_pert:J2', 'a_pert_I')])
+
         self.add_subsystem('ori_comp',
                            ORIComp(num_nodes=nn),
                            promotes_inputs=['r_e2b_I', 'v_e2b_I'],
@@ -45,4 +50,4 @@ class CadreOrbitODE(Group):
                            promotes_outputs=['O_BI'])
 
         self.add_subsystem('orbit_eom_comp', OrbitEOMComp(num_nodes=nn),
-                           promotes_inputs=['rmag_e2b_I', 'r_e2b_I', 'v_e2b_I'])
+                           promotes_inputs=['rmag_e2b_I', 'r_e2b_I', 'v_e2b_I', 'a_pert_I'])

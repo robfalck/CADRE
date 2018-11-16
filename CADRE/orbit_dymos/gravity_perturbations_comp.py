@@ -84,9 +84,6 @@ class GravityPerturbationsComp(ExplicitComponent):
 
         outputs['a_pert:J2'] = a2[:, np.newaxis] * (b2 + c2)
 
-        print()
-        print(outputs['a_pert:J2'])
-
     def compute_partials(self, inputs, partials):
         nn = self.options['num_nodes']
 

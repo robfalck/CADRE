@@ -112,8 +112,8 @@ systems_phase.add_control('r_e2b_I', opt=False, units='km')
 systems_phase.add_control('O_BI', opt=False)
 systems_phase.add_control('w_B', opt=False)
 systems_phase.add_control('wdot_B', opt=False)
-systems_phase.add_control('P_comm', opt=False, lower=0.0, upper=30.0, units='W')
-systems_phase.add_control('Isetpt', opt=False, lower=0.0, upper=0.4, units='A')
+systems_phase.add_control('P_comm', opt=True, lower=0.0, upper=30.0, units='W')
+systems_phase.add_control('Isetpt', opt=True, lower=1.0E-4, upper=0.4, units='A')
 
 # Connect r_e2b_I and O_BI values from all nodes in the orbit phase to the input values
 # in the attitude phase.
