@@ -1,5 +1,7 @@
 """
 Optimization of solar power over time for the CADRE MDP.
+
+This is a much reduced model of CADRE.
 """
 from __future__ import print_function
 
@@ -93,8 +95,10 @@ class MPPT_MDP(Group):
         fpath = os.path.dirname(os.path.realpath(CADRE.test.__file__))
         data = pickle.load(open(fpath + '/data1346.pkl', 'rb'))
 
-        pt0 = MPPT(data['0:LOS'], data['0:temperature'], data['0:exposedArea'], m, n)
-        pt1 = MPPT(data['1:LOS'], data['1:temperature'], data['1:exposedArea'], m, n)
+        pt0 = MPPT(data['0:LOS'], data['0:temperature'].T,
+                   np.transpose(data['0:exposedArea'], (2, 0, 1)), m, n)
+        pt1 = MPPT(data['1:LOS'], data['1:temperature'].T,
+                   np.transpose(data['1:exposedArea'], (2, 0, 1)), m, n)
 
         # CADRE instances go into a Parallel Group
         para = self.add_subsystem('parallel', ParallelGroup(), promotes=['*'])
