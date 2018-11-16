@@ -115,6 +115,7 @@ class TestCadreOrbitODE(unittest.TestCase):
         systems_phase.add_control('O_BI', opt=False)
         systems_phase.add_control('w_B', opt=False)
         systems_phase.add_control('wdot_B', opt=False)
+        systems_phase.add_control('P_comm', lower=0.0, upper=10.0, units='W')
 
         # Connect r_e2b_I and O_BI values from all nodes in the orbit phase to the input values
         # in the attitude phase.

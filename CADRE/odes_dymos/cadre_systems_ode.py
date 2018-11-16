@@ -1,19 +1,14 @@
 from __future__ import print_function, division, absolute_import
 
-import numpy as np
-
-from openmdao.api import Group, VectorMagnitudeComp
+from openmdao.api import Group
 
 from dymos import declare_state, declare_time, declare_parameter
 
 from CADRE.battery_dymos import BatterySOCComp
-from CADRE.orbit_eom import OrbitEOMComp
 from CADRE.rw_dymos.rw_group import ReactionWheelGroup
 from CADRE.solar_dymos import SolarExposedAreaComp
 from CADRE.sun_dymos.sun_group import SunGroup
 from CADRE.thermal_dymos import ThermalTemperatureComp
-from CADRE.attitude_dymos.attitude_group import AttitudeGroup
-from CADRE.temperature_rate_collect_comp import TemperatureRateCollectComp
 from CADRE.comm_dymos import CommGroup
 
 

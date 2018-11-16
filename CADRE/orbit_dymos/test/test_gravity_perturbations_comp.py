@@ -5,9 +5,9 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Group
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_check_partials
 
-from CADRE.gravity_perturbations_comp import GravityPerturbationsComp
+from CADRE.orbit_dymos.gravity_perturbations_comp import GravityPerturbationsComp
 
 class TestOrbitEOM(unittest.TestCase):
 
