@@ -24,7 +24,7 @@ class SunPositionECIComp(ExplicitComponent):
         nn = self.options['num_nodes']
 
         # Inputs
-        self.add_input('LD', 0.0, units='d',
+        self.add_input('LD', 5233.5, units='d',
                        desc='Launch day.')
 
         self.add_input('t', np.zeros((nn, )), units='s',

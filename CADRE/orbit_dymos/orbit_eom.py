@@ -45,7 +45,7 @@ class OrbitEOMComp(ExplicitComponent):
                        desc='Velocity vectors from earth to satellite '
                             'in Earth-centered inertial frame over time')
 
-        self.add_input('rmag_e2b', 1000.0*np.ones((nn,)), units='km',
+        self.add_input('rmag_e2b_I', 1000.0*np.ones((nn,)), units='km',
                        desc='Position and velocity vectors from earth to satellite '
                             'in Earth-centered inertial frame over time')
 
@@ -70,11 +70,11 @@ class OrbitEOMComp(ExplicitComponent):
         rs = np.arange(nn * 3, dtype=int)
         cs = np.repeat(np.arange(nn, dtype=int), 3)
 
-        self.declare_partials(of='dXdt:v_e2b_I', wrt='rmag_e2b', rows=rs, cols=cs, val=1.0)
+        self.declare_partials(of='dXdt:v_e2b_I', wrt='rmag_e2b_I', rows=rs, cols=cs, val=1.0)
 
     def compute(self, inputs, outputs):
         r = inputs['r_e2b_I']
-        rmag = inputs['rmag_e2b']
+        rmag = inputs['rmag_e2b_I']
         v = inputs['v_e2b_I']
         GM = self.options['GM']
         a_pert_I = inputs['a_pert_I']
@@ -84,10 +84,10 @@ class OrbitEOMComp(ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         r = inputs['r_e2b_I']
-        rmag = inputs['rmag_e2b']
+        rmag = inputs['rmag_e2b_I']
         GM = self.options['GM']
 
-        partials['dXdt:v_e2b_I', 'rmag_e2b'] = (3 * GM * r / rmag[:, np.newaxis]**4).ravel()
+        partials['dXdt:v_e2b_I', 'rmag_e2b_I'] = (3 * GM * r / rmag[:, np.newaxis]**4).ravel()
         partials['dXdt:v_e2b_I', 'r_e2b_I'] = -GM / np.repeat(rmag, 3)**3
 
 

@@ -8,6 +8,7 @@ from openmdao.api import Group
 from CADRE.rw_dymos.rw_dynamics import ReactionWheelDynamics
 from CADRE.rw_dymos.rw_motor import ReactionWheelMotorComp
 from CADRE.rw_dymos.rw_power import ReactionWheelPowerComp
+from CADRE.rw_dymos.rw_torque import ReactionWheelTorqueComp
 
 
 class ReactionWheelGroup(Group):
@@ -30,15 +31,19 @@ class ReactionWheelGroup(Group):
         nn = self.options['num_nodes']
         J_RW = self.options['J_RW']
 
+        self.add_subsystem('rw_torque',
+                           ReactionWheelTorqueComp(num_nodes=nn),
+                           promotes_inputs=['w_B', 'wdot_B'], promotes_outputs=['T_RW'])
+
         self.add_subsystem('rw_dynamics',
                            ReactionWheelDynamics(num_nodes=nn, J_RW=J_RW),
-                           promotes_inputs=['w_B', 'w_RW'], promotes_outputs=['dXdt:w_RW'])
+                           promotes_inputs=['T_RW', 'w_B', 'w_RW'], promotes_outputs=['dXdt:w_RW'])
 
         self.add_subsystem('rw_motor',
                            ReactionWheelMotorComp(num_nodes=nn, J_RW=J_RW),
-                           promotes_inputs=['T_RW', 'w_B', 'w_RW'])
+                           promotes_inputs=['T_RW', 'w_B', 'w_RW'],
+                           promotes_outputs=['T_m'])
 
         self.add_subsystem('rw_power',
                            ReactionWheelPowerComp(num_nodes=nn),
-                           promotes_inputs=['w_RW'], promotes_outputs=['P_RW'])
-
+                           promotes_inputs=['T_RW', 'w_RW'], promotes_outputs=['P_RW'])
