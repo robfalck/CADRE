@@ -19,7 +19,8 @@ GM = 398600.44
 rmag = 7000.0
 period = 2 * np.pi * np.sqrt(rmag ** 3 / GM)
 vcirc = np.sqrt(GM / rmag)
-duration = period / 1
+duration = period
+duration = 9 * 3600.0
 
 
 
@@ -33,7 +34,7 @@ p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-4
 p.driver.opt_settings['Major optimality tolerance'] = 1.0E-4
 p.driver.opt_settings['iSumm'] = 6
 
-NUM_SEG = 10
+NUM_SEG = 30
 TRANSCRIPTION_ORDER = 7
 
 orbit_phase = Phase('radau-ps',
@@ -44,7 +45,7 @@ orbit_phase = Phase('radau-ps',
 
 p.model.add_subsystem('orbit_phase', orbit_phase)
 
-orbit_phase.set_time_options(fix_initial=True, fix_duration=True)
+orbit_phase.set_time_options(fix_initial=True, fix_duration=True, duration_ref=duration)
 orbit_phase.set_state_options('r_e2b_I', defect_scaler=1000, fix_initial=True, units='km')
 orbit_phase.set_state_options('v_e2b_I', defect_scaler=1000, fix_initial=True, units='km/s')
 # orbit_phase.set_state_options('SOC', defect_scaler=1, fix_initial=True, units=None)
@@ -95,8 +96,8 @@ systems_phase = Phase('radau-ps',
 
 p.model.add_subsystem('systems_phase', systems_phase)
 
-systems_phase.set_time_options(fix_initial=True, fix_duration=True)
-systems_phase.set_state_options('SOC', defect_ref=1, fix_initial=True, units=None)
+systems_phase.set_time_options(fix_initial=True, fix_duration=True, duration_ref=duration)
+systems_phase.set_state_options('SOC', defect_ref=10, fix_initial=True, units=None)
 systems_phase.set_state_options('w_RW', defect_ref=1000, fix_initial=True, units='1/s')
 systems_phase.set_state_options('data', defect_ref=10, fix_initial=True, units='Gibyte')
 systems_phase.set_state_options('temperature', ref0=273, ref=373, defect_ref=100,
