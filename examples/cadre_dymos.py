@@ -4,8 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, pyOptSparseDriver, DirectSolver
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.api import Problem, Group, pyOptSparseDriver, DirectSolver, SqliteRecorder
 
 from dymos import Phase
 from dymos.utils.indexing import get_src_indices_by_row
@@ -34,6 +33,14 @@ p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-4
 p.driver.opt_settings['Major optimality tolerance'] = 1.0E-4
 p.driver.opt_settings['Major step limit'] = 0.1
 p.driver.opt_settings['iSumm'] = 6
+
+p.driver.recording_options['includes'] = ['*']
+p.driver.recording_options['record_objectives'] = True
+p.driver.recording_options['record_constraints'] = True
+p.driver.recording_options['record_desvars'] = True
+
+recorder = SqliteRecorder("cases.sql")
+p.driver.add_recorder(recorder)
 
 NUM_SEG = 30
 TRANSCRIPTION_ORDER = 3
@@ -229,7 +236,8 @@ plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_bat'), 'k
 
 plt.figure()
 
-plt.plot(systems_phase.get_values('time'), systems_phase.get_values('SOC'), 'ro')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('SOC'), 'r-')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('dXdt:SOC'), 'r--')
 
 plt.show()
 
