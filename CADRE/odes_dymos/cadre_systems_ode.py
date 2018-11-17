@@ -58,7 +58,7 @@ class CadreSystemsODE(Group):
         self.add_subsystem('power_group', PowerGroup(num_nodes=nn),
                            promotes_inputs=['LOS', 'temperature', 'exposed_area', 'Isetpt',
                                             'P_comm', 'P_RW'],
-                           promotes_outputs=['P_bat'])
+                           promotes_outputs=['P_bat', 'P_sol'])
 
         self.add_subsystem('battery_soc_comp', BatterySOCComp(num_nodes=nn),
                            promotes_inputs=['SOC', 'P_bat', 'temperature'])
