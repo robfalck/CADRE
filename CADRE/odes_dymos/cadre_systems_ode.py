@@ -45,7 +45,8 @@ class CadreSystemsODE(Group):
                            promotes_outputs=['exposed_area'])
 
         self.add_subsystem('comm_group', CommGroup(num_nodes=nn),
-                           promotes_inputs=[('t', 'time'), 'r_e2b_I', 'antAngle', 'P_comm', 'O_BI'])
+                           promotes_inputs=[('t', 'time'), 'r_e2b_I', 'antAngle', 'P_comm', 'O_BI'],
+                           promotes_outputs=['CommLOS'])
 
         self.add_subsystem('rw_group', ReactionWheelGroup(num_nodes=nn),
                            promotes_inputs=['w_RW', 'w_B', 'wdot_B'],
@@ -61,4 +62,5 @@ class CadreSystemsODE(Group):
                            promotes_outputs=['P_bat', 'P_sol'])
 
         self.add_subsystem('battery_soc_comp', BatterySOCComp(num_nodes=nn),
-                           promotes_inputs=['SOC', 'P_bat', 'temperature'])
+                           promotes_inputs=['SOC', 'P_bat', 'temperature'],
+                           promotes_outputs=['I_bat'])

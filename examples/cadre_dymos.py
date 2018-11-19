@@ -15,10 +15,10 @@ from CADRE.attitude_dymos.angular_velocity_comp import AngularVelocityComp
 from CADRE.odes_dymos.cadre_systems_ode import CadreSystemsODE
 
 GM = 398600.44
-rmag = 7000.0
-period = 2 * np.pi * np.sqrt(rmag ** 3 / GM)
-vcirc = np.sqrt(GM / rmag)
-duration = period
+# rmag = 7000.0
+# period = 2 * np.pi * np.sqrt(rmag ** 3 / GM)
+# vcirc = np.sqrt(GM / rmag)
+# duration = period
 duration = 6 * 3600.0
 
 
@@ -27,22 +27,25 @@ p = Problem(model=Group())
 
 p.driver = pyOptSparseDriver()
 p.driver.options['optimizer'] = 'SNOPT'
+
 p.driver.options['dynamic_simul_derivs'] = True
+# p.driver.set_simul_deriv_color('coloring_30-3.json')
+
 p.driver.opt_settings['Major iterations limit'] = 1000
-p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-4
+p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-5
 p.driver.opt_settings['Major optimality tolerance'] = 1.0E-4
 p.driver.opt_settings['Major step limit'] = 0.1
 p.driver.opt_settings['iSumm'] = 6
 
-p.driver.recording_options['includes'] = ['*']
+p.driver.recording_options['includes'] = []
 p.driver.recording_options['record_objectives'] = True
 p.driver.recording_options['record_constraints'] = True
 p.driver.recording_options['record_desvars'] = True
 
-recorder = SqliteRecorder("cases.sql")
+recorder = SqliteRecorder("cadre_dymos.sql")
 p.driver.add_recorder(recorder)
 
-NUM_SEG = 30
+NUM_SEG = 40
 TRANSCRIPTION_ORDER = 3
 
 orbit_phase = Phase('radau-ps',
@@ -58,8 +61,10 @@ orbit_phase.set_state_options('r_e2b_I', defect_scaler=1000, fix_initial=True, u
 orbit_phase.set_state_options('v_e2b_I', defect_scaler=1000, fix_initial=True, units='km/s')
 # orbit_phase.set_state_options('SOC', defect_scaler=1, fix_initial=True, units=None)
 # orbit_phase.add_design_parameter('P_bat', opt=False, units='W')
-orbit_phase.add_control('Gamma', opt=True, lower=-90, upper=90, units='deg', ref0=-90, ref=90,
+orbit_phase.add_control('Gamma', opt=True, units='deg', ref0=-180, ref=180,
                         continuity=True, rate_continuity=True)
+
+orbit_phase.add_path_constraint('Gamma_rate', lower=-10, upper=10, units='deg/s', ref0=-10, ref=10)
 
 # Add a control interp comp to interpolate the rates of O_BI from the orbit phase.
 faux_control_options = {'O_BI': {'units': None, 'shape': (3, 3)}}
@@ -105,7 +110,7 @@ systems_phase = Phase('radau-ps',
 p.model.add_subsystem('systems_phase', systems_phase)
 
 systems_phase.set_time_options(fix_initial=True, fix_duration=True, duration_ref=duration)
-systems_phase.set_state_options('SOC', defect_ref=10, lower=0.2, fix_initial=True, units=None)
+systems_phase.set_state_options('SOC', defect_ref=10, fix_initial=True, units=None)
 systems_phase.set_state_options('w_RW', defect_ref=10000, fix_initial=True, units='1/s')
 systems_phase.set_state_options('data', defect_ref=10, fix_initial=True, units='Gibyte')
 systems_phase.set_state_options('temperature', ref0=273, ref=373, defect_ref=1000,
@@ -121,10 +126,15 @@ systems_phase.add_control('r_e2b_I', opt=False, units='km')
 systems_phase.add_control('O_BI', opt=False)
 systems_phase.add_control('w_B', opt=False)
 systems_phase.add_control('wdot_B', opt=False)
-systems_phase.add_control('P_comm', opt=True, lower=0.0, upper=30.0, units='W')
-systems_phase.add_control('Isetpt', opt=True, lower=1.0E-4, upper=0.4, units='A')
+systems_phase.add_control('P_comm', opt=True, lower=0.0, upper=25.0, ref=0.25, units='W',
+                          continuity=True, rate_continuity=True)
+systems_phase.add_control('Isetpt', opt=True, lower=0, upper=0.4, units='A',
+                          continuity=True, rate_continuity=True)
 
-systems_phase.add_objective('data', loc='final', ref=-1.0)
+systems_phase.add_objective('data', loc='final', ref=-100.0)
+# systems_phase.add_objective('SOC', loc='final', ref=-1.0)
+
+systems_phase.add_path_constraint('I_bat', lower=-10, upper=10)
 
 # Connect r_e2b_I and O_BI values from all nodes in the orbit phase to the input values
 # in the attitude phase.
@@ -169,6 +179,8 @@ p['orbit_phase.states:v_e2b_I'][:, 0] = 2.56640460e-01
 p['orbit_phase.states:v_e2b_I'][:, 1] = 3.00387409e+00
 p['orbit_phase.states:v_e2b_I'][:, 2] = 6.99018448e+00
 
+p['orbit_phase.controls:Gamma'] = 0.0
+
 # Initialize values in the systems phase
 
 p['systems_phase.t_initial'] = 0.0
@@ -186,12 +198,12 @@ p['systems_phase.states:temperature'] = 273.0
 # p['systems_phase.states:v_e2b_I'][:, 0] = 0.0
 # p['systems_phase.states:v_e2b_I'][:, 1] = vcirc
 # p['systems_phase.states:v_e2b_I'][:, 2] = 0.0
-p['systems_phase.controls:P_comm'] = 0.01
-p['systems_phase.controls:Isetpt'] = 0.1
+p['systems_phase.controls:P_comm'] = 5.0
+p['systems_phase.controls:Isetpt'] = 0.3
 
 p['systems_phase.design_parameters:LD'] = 5233.5
 p['systems_phase.design_parameters:fin_angle'] = np.radians(70.0)
-p['systems_phase.design_parameters:cellInstd'] = 0.0
+p['systems_phase.design_parameters:cellInstd'] = 1.0
 
 p.run_model()
 
@@ -210,7 +222,10 @@ exp_out = orbit_phase.simulate()
 p['orbit_phase.states:r_e2b_I'] = orbit_phase.interpolate(ys=exp_out.get_values('r_e2b_I'), xs=exp_out.get_values('time'), nodes='state_input')
 p['orbit_phase.states:v_e2b_I'] = orbit_phase.interpolate(ys=exp_out.get_values('v_e2b_I'), xs=exp_out.get_values('time'), nodes='state_input')
 
-p.run_driver()
+p.run_model()
+systems_phase.simulate()
+
+# p.run_driver()
 
 r_e2b_I = p.model.orbit_phase.get_values('r_e2b_I')
 v_e2b_I = p.model.orbit_phase.get_values('v_e2b_I')
@@ -221,23 +236,38 @@ rmag_e2b = p.model.orbit_phase.get_values('rmag_e2b_I')
 import matplotlib.pyplot as plt
 
 plt.figure()
-plt.plot(orbit_phase.get_values('r_e2b_I')[:, 0], orbit_phase.get_values('r_e2b_I')[:, 1], 'ro')
+plt.plot(orbit_phase.get_values('r_e2b_I')[:, 0], orbit_phase.get_values('r_e2b_I')[:, 1], 'r-')
 
 plt.figure()
 # plt.plot(exp_out.get_values('time')[:, 0], exp_out.get_values('data')[:, 1], 'b-')
-plt.plot(systems_phase.get_values('time'), systems_phase.get_values('data'), 'ro')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('data'), 'r-', label='data')
+plt.legend(loc='best')
 
 plt.figure()
 # plt.plot(exp_out.get_values('time')[:, 0], exp_out.get_values('data')[:, 1], 'b-')
-plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_comm'), 'r-')
-plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_sol'), 'b-')
-plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_RW'), 'g-')
-plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_bat'), 'k-')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_comm'), 'r-', label='P_comm')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_sol'), 'b-', label='P_sol')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_RW'), 'g-', label='P_RW')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('P_bat'), 'k-', label='P_bat')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('LOS'), 'm--', label='LOS')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('CommLOS'), 'c--', label='CommLOS')
+plt.legend(loc='best')
 
 plt.figure()
 
 plt.plot(systems_phase.get_values('time'), systems_phase.get_values('SOC'), 'r-')
-plt.plot(systems_phase.get_values('time'), systems_phase.get_values('dXdt:SOC'), 'r--')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('battery_soc_comp.dXdt:SOC'), 'r--')
+
+
+plt.figure()
+
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('LOS'), 'r-')
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('CommLOS'), 'b-')
+
+
+plt.figure()
+
+plt.plot(systems_phase.get_values('time'), systems_phase.get_values('w_RW'), 'r-')
 
 plt.show()
 

@@ -13,7 +13,7 @@ class TestBatteryDymos(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        nn = 6
+        nn = 1
 
         cls.p = Problem(model=Group())
 
@@ -27,14 +27,14 @@ class TestBatteryDymos(unittest.TestCase):
 
         cls.p.setup(check=True, force_alloc_complex=True)
 
-        cls.p['temperature'] = 273 + np.random.rand(nn, 5) * 100
-        cls.p['P_bat'] = np.random.rand(nn) * 100
-        cls.p['SOC'] = np.random.rand(nn)
+        cls.p['temperature'] = [273]
+        cls.p['P_bat'] = [-5.367027480039444]
+        cls.p['SOC'] = [0.5]
 
         cls.p.run_model()
 
     def test_results(self):
-        self.assertTrue(np.all(self.p['dXdt:SOC'] < 0))
+        assert_rel_error(self, self.p['dXdt:SOC'], -0.00017315205907570555)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
