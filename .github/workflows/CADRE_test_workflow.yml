@@ -4,9 +4,9 @@ name: CADRE Tests
 on:
   # Trigger on push or pull request events for the master branch
   push:
-    branches: [ master ]
+    branches: [ master, cadre_dymos ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, cadre_dymos ]
 
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
