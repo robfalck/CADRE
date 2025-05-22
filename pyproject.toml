@@ -24,8 +24,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "numpy<2.0",
-    "openmdao>=2.3",
+    "dymos>=1.13
+    "numpy",
+    "openmdao>=3.38",
     "six",
 ]
 
