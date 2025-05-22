@@ -58,6 +58,6 @@ class ReactionWheel(om.JaxExplicitComponent):
                           w_B[:,2]*w_RW[:,0] - w_B[:,0]*w_RW[:,2],
                          -w_B[:,1]*w_RW[:,0] + w_B[:,0]*w_RW[:,1]))
         jax.debug.print('{a2}', a2=a2.shape)
-        alpha_RW = -T_RW / self.J_RW
+        alpha_RW = -T_RW / self.J_RW - a2
 
         return P_RW, alpha_RW
