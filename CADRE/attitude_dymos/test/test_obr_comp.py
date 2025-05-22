@@ -3,7 +3,9 @@ import unittest
 import openmdao.api as om
 import numpy as np
 
-from CADRE.attitude_dymos.OBRComp import OBRComp
+from openmdao.utils.assert_utils import assert_near_equal
+
+from CADRE.attitude_dymos.obr_comp import OBRComp
 
 
 class TestOBRComp(unittest.TestCase):
@@ -18,8 +20,26 @@ class TestOBRComp(unittest.TestCase):
 
         p.run_model()
 
-        print(p.get_val('gamma'))
-        print(p.get_val('O_BR'))
+        gam = p.get_val('gamma')
+        sgam = np.sin(gam)
+        cgam = np.cos(gam)
+
+        O_BR = p.get_val('O_BR')
+
+        z = np.zeros(1000)
+        o = np.ones(1000)
+
+        assert_near_equal(O_BR[:, 0, 0], cgam)
+        assert_near_equal(O_BR[:, 0, 1], sgam)
+        assert_near_equal(O_BR[:, 0, 2], z)
+        assert_near_equal(O_BR[:, 1, 0], -sgam)
+        assert_near_equal(O_BR[:, 1, 1], cgam)
+        assert_near_equal(O_BR[:, 1, 2], z)
+        assert_near_equal(O_BR[:, 2, 0], z)
+        assert_near_equal(O_BR[:, 2, 1], z)
+        assert_near_equal(O_BR[:, 2, 2], o)
+
+
 
 
 
