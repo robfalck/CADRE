@@ -74,6 +74,10 @@ jobs:
             build_pyoptsparse -v -s SNOPT/src
           fi
 
+      - name: Install dymos
+        run: |
+          python -m pip install pip install git+https://github.com/OpenMDAO/dymos
+
       - name: Install PETSc
         run: |
           echo "============================================================="
