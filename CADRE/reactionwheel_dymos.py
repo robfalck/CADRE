@@ -19,20 +19,20 @@ class ReactionWheel(om.JaxExplicitComponent):
         n = self.options['num_nodes']
 
         # Inputs
-        self.add_input('w_B', jnp.zeros((n, 3)), units='1/s',
+        self.add_input('w_B', shape=(n, 3), units='1/s',
                        desc='Angular velocity vector in body-fixed frame over time')
-        
-        self.add_input('w_RW', jnp.zeros((n, 3)), units='1/s',
+
+        self.add_input('w_RW', shape=(n, 3), units='1/s',
                        desc='Angular velocity vector of reaction wheel over time')
 
-        self.add_input('T_RW', jnp.zeros((n, 3)), units='N*m',
+        self.add_input('T_RW', shape=(n, 3), units='N*m',
                        desc='Torque vector of reaction wheel over time')
 
         # Outputs
-        self.add_output('P_RW', jnp.ones((n, 3)), units='W',
+        self.add_output('P_RW', shape=(n, 3), units='W',
                         desc='Reaction wheel power over time')
-        
-        self.add_output('alpha_RW', jnp.zeros((n, 3)), units='1/s**2',
+
+        self.add_output('alpha_RW', shape=(n, 3), units='1/s**2',
                         desc='Angular acceleration vector of reaction wheel over time')
 
         # unit conversion of some kind
@@ -42,14 +42,14 @@ class ReactionWheel(om.JaxExplicitComponent):
         """
         Calculate outputs.
         """
-        P_RW0 = (self.V * (self.a * w_RW[0, :] +
-                          self.b * T_RW[0, :])**2 +
+        P_RW0 = (self.V * (self.a * w_RW[:, 0] +
+                          self.b * T_RW[:, 0])**2 +
                           self.V * self.I0)
-        P_RW1 = (self.V * (self.a * w_RW[1, :] +
-                          self.b * T_RW[1, :])**2 +
+        P_RW1 = (self.V * (self.a * w_RW[:, 1] +
+                          self.b * T_RW[:, 1])**2 +
                           self.V * self.I0)
-        P_RW2 = (self.V * (self.a * w_RW[2, :] +
-                          self.b * T_RW[2, :])**2 +
+        P_RW2 = (self.V * (self.a * w_RW[:, 2] +
+                          self.b * T_RW[:, 2])**2 +
                           self.V * self.I0)
 
         P_RW = jnp.vstack((P_RW0, P_RW1, P_RW2))
@@ -57,7 +57,7 @@ class ReactionWheel(om.JaxExplicitComponent):
         a2 = jnp.vstack((-w_B[:,2]*w_RW[:,1] + w_B[:,1]*w_RW[:,2],
                           w_B[:,2]*w_RW[:,0] - w_B[:,0]*w_RW[:,2],
                          -w_B[:,1]*w_RW[:,0] + w_B[:,0]*w_RW[:,1]))
-        jax.debug.print('{a2}', a2=a2.shape)
-        alpha_RW = -T_RW / self.J_RW - a2
+
+        alpha_RW = -T_RW / self.J_RW - a2.T
 
         return P_RW, alpha_RW
