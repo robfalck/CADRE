@@ -24,6 +24,8 @@ classifiers = [
 ]
 
 dependencies = [
+    "jax",
+    "dymos>=1.13",
     "numpy<2.0",
     "openmdao>=2.3",
     "six",

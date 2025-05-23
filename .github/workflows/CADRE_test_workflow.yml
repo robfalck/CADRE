@@ -74,9 +74,24 @@ jobs:
             build_pyoptsparse -v -s SNOPT/src
           fi
 
+      - name: Install dymos
+        run: |
+          python -m pip install git+https://github.com/OpenMDAO/dymos
+
       - name: Install PETSc
         run: |
-          conda install mpi4py petsc4py -q -y
+          echo "============================================================="
+          echo "Install compilers for PETSc"
+          echo "============================================================="
+          COMPILERS="cython compilers openmpi-mpicc"
+          conda install $COMPILERS -q -y
+
+          echo "============================================================="
+          echo "Install PETSc"
+          echo "============================================================="
+          python -m pip install git+https://github.com/mpi4py/mpi4py
+          python -m pip install petsc petsc4py
+
 
           echo "============================================================="
           echo "Check MPI and PETSc installation"
@@ -95,7 +110,7 @@ jobs:
                                  print(x.getArray())"
           echo "-----------------------"
 
-          echo "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
+          echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
           echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
 
