@@ -5,7 +5,7 @@ import numpy as np
 class SphericalHarmonicsComp(om.ExplicitComponent):
     def initialize(self):
         self.options.declare('num_nodes', types=int)
-        self.options.declare('central_body', types=str, values=('earth', 'sun', 'moon'))
+        self.options.declare('central_body', values=('earth', 'sun', 'moon'))
 
     def setup(self):
         nn = self.options['num_nodes']
@@ -31,9 +31,9 @@ class SphericalHarmonicsComp(om.ExplicitComponent):
         J2 = 202.7e-6
 
         r = inputs['r']
-        h = inputs['h'][:, np.newaxis]
-        k = inputs['k'][:, np.newaxis]
-        L = inputs['L'][np.newaxis, :]
+        h = inputs['h']
+        k = inputs['k']
+        L = inputs['L']
         s_sq = 1 + h**2 + k**2
 
         outputs['J2_r'] = -3 * J2 * (1 - 12 * ((h * np.sin(L) - k * np.cos(L)) / s_sq) ** 2) / (2 * r**4)
@@ -45,7 +45,7 @@ class SphericalHarmonicsComp(om.ExplicitComponent):
 
 if __name__ == '__main__':
     p = om.Problem()
-    p.model.add_subsystem('harmonics', SphericalHarmonics(num_nodes=3, num_quadrature_nodes=9, mu=3.98E5),
+    p.model.add_subsystem('harmonics', SphericalHarmonicsComp(num_nodes=3, num_quadrature_nodes=9, mu=3.98E5),
                           promotes_inputs=['*'], promotes_outputs=['*'])
 
     p.setup()

@@ -1,13 +1,13 @@
 import numpy as np
 import openmdao.api as om
-import CADRE.orbit
+import CADRE.orbital_equations
 from openmdao.utils.cs_safe import arctan2
 
 
 class MEEToKep(om.ExplicitComponent):
     def initialize(self):
         self.options.declare('num_nodes', types=int)
-        self.options.declare('central_body', types=str, values=('earth', 'sun', 'moon'))
+        self.options.declare('central_body', values=('earth', 'sun', 'moon'))
 
     def setup(self):
         nn = self.options['num_nodes']

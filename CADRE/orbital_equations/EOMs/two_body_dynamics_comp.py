@@ -1,6 +1,6 @@
 import numpy as np
 import openmdao.api as om
-import CADRE.orbit
+import CADRE.orbital_equations
 
 from openmdao.utils.assert_utils import assert_check_partials
 
@@ -9,7 +9,7 @@ class TwoBodyDynamicsComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_nodes', types=int, default=1)
-        self.options.declare('central_body', types=str, values=('earth', 'sun', 'moon'))
+        self.options.declare('central_body', values=('earth', 'sun', 'moon'))
 
     def setup(self):
         nn = self.options['num_nodes']
@@ -24,9 +24,9 @@ class TwoBodyDynamicsComp(om.ExplicitComponent):
         self.add_input('L', val=np.ones(nn), desc='true longitude', units='rad')
 
         # Perturbations
-        self.add_input('a_r', val=np.ones(nn), desc='perturbations in radial direction', units=f'DU_{cb}/TU_{cb}**2')
-        self.add_input('a_s', val=np.ones(nn), desc='perturbations in tangent direction', units=f'DU_{cb}/TU_{cb}**2')
-        self.add_input('a_w', val=np.ones(nn), desc='perturbations in normal direction', units=f'DU_{cb}/TU_{cb}**2')
+        self.add_input('a_r', val=np.zeros(nn), desc='perturbations in radial direction', units=f'DU_{cb}/TU_{cb}**2')
+        self.add_input('a_s', val=np.zeros(nn), desc='perturbations in tangent direction', units=f'DU_{cb}/TU_{cb}**2')
+        self.add_input('a_w', val=np.zeros(nn), desc='perturbations in normal direction', units=f'DU_{cb}/TU_{cb}**2')
 
         # Outputs
         self.add_output('p_dot', val=np.ones(nn), desc='rate of change of semi-parameter', units=f'DU_{cb}/TU_{cb}')
@@ -196,7 +196,7 @@ class TwoBodyDynamicsComp(om.ExplicitComponent):
 
 if __name__ == '__main__':
     p = om.Problem(om.Group())
-    p.model.add_subsystem('mee', Dynamics())
+    p.model.add_subsystem('mee', TwoBodyDynamicsComp())
 
     p.setup(force_alloc_complex=True)
     p.run_model()
