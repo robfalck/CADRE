@@ -9,7 +9,8 @@ from openmdao.utils.testing_utils import use_tempdirs
 
 from CADRE.orbital_equations.EOMs import TwoBodyDynamicsComp
 from CADRE.orbital_equations.frame_conversions import MEEToCart
-from CADRE.attitude_dymos import BodyVelComp, OBRComp, OBIComp, ORIComp, OdotBIComp
+from CADRE.attitude_dymos import AngularAccelerationComp, AngularVelocityComp, AttitudeTorqueComp, \
+    BodyVelComp, OBRComp, OBIComp, ORIComp, OdotBIComp
 from CADRE.orbital_equations.frame_conversions import StateMuxComp
 
 
@@ -52,7 +53,10 @@ class TestOrbitProp(unittest.TestCase):
                 self.add_subsystem('obr_comp', OBRComp(num_nodes=nn), promotes=['*'])
                 self.add_subsystem('obi_comp', OBIComp(num_nodes=nn), promotes=['*'])
                 self.add_subsystem('odotbi_comp', OdotBIComp(num_nodes=nn, grid_data=gd), promotes=['*'])
+                self.add_subsystem('omega_comp', AngularVelocityComp(num_nodes=nn), promotes=['*'])
+                self.add_subsystem('omega_dot_comp', AngularAccelerationComp(num_nodes=nn, grid_data=gd), promotes=['*'])
                 self.add_subsystem('body_vel_comp', BodyVelComp(num_nodes=nn), promotes=['*'])
+                self.add_subsystem('torque_req_comp', AttitudeTorqueComp(num_nodes=nn), promotes=['*'])
 
         nn = 50
         traj = prob.model.add_subsystem('traj', dm.Trajectory())
@@ -74,7 +78,9 @@ class TestOrbitProp(unittest.TestCase):
         orbit.add_state('L', fix_initial=True, units='rad', rate_source='L_dot')
         orbit.add_objective('time', loc='final')
 
-        orbit.add_timeseries_output(['x', 'y', 'z', 'vx', 'vy', 'vz', 'r_e2b_I', 'v_e2b_I', 'v_e2b_B', 'O_BI', 'O_BR', 'O_RI', 'Odot_BI'])
+        orbit.add_timeseries_output(['x', 'y', 'z', 'vx', 'vy', 'vz', 'r_e2b_I',
+                                     'v_e2b_I', 'v_e2b_B', 'O_BI', 'O_BR', 'O_RI', 'Odot_BI',
+                                     'w_B', 'wdot_B', 'T_req'])
 
         prob.setup()
 

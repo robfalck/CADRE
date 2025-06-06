@@ -4,14 +4,14 @@ from jax.experimental import sparse as jsp
 import jax.numpy as jnp
 
 
-def _compute_OdotBI(O_BI, D, dt_dstau):
+def _compute_wdot_B(w_B, D, dt_dstau):
     """
     Return a the transformation matrix from the rolled frame to the inertial frame.
 
     Parameters
     ----------
-    O_BI : array-like (n, 3, 3)
-        The transformation matrix from the body to the inertial frame at n points in time.
+    w_dot : array-like (n, 3)
+        Angular velocity of the body frame wrt the inertial frame at n points in time.
     D : array_like (n, n)
         A differentiation matrix which, when multiplied by a value at n points in time,
         provides the rate of change of the value with respect to non-dimensional time.
@@ -22,18 +22,16 @@ def _compute_OdotBI(O_BI, D, dt_dstau):
 
     Returns
     -------
-    O_RI : array-like
-        Transformation matrix to transform from the rolled frame to the inertial frame.
+    wdot_B : array-like
+        Angular acceleration of the body frame wrt the inertial frame.
     """
-    nn = O_BI.shape[0]
-    obi_flat = jnp.reshape(O_BI, (nn, 9))
-    rate = D @ obi_flat / dt_dstau[:, jnp.newaxis]
-    return jnp.reshape(rate, (nn, 3, 3))
+    rate = D @ w_B / dt_dstau[:, jnp.newaxis]
+    return rate
 
 
-class OdotBIComp(om.JaxExplicitComponent):
+class AngularAccelerationComp(om.JaxExplicitComponent):
     """
-    Calculates time derivative of body frame orientation matrix.
+    Calculates time derivative of the body frame angular velocity wrt the inertial frame.
 
     This is accomplished by passing in O_BI at all points, and multiplying
     it by the differentiation matrix (giving the rate of change in dimensionless time, tau)
@@ -44,7 +42,6 @@ class OdotBIComp(om.JaxExplicitComponent):
     """
     def initialize(self):
         self.options.declare('num_nodes', types=int)
-        self.options.declare('time_units', types=str, default='s')
         self.options.declare('grid_data')
 
     def get_self_statics(self):
@@ -58,15 +55,14 @@ class OdotBIComp(om.JaxExplicitComponent):
         self._D = jsp.BCOO.fromdense(self._D)
 
         # Inputs
-        self.add_input('O_BI', shape=(nn, 3, 3), units='unitless',
-                       desc='Rotation matrix from body-fixed frame to Earth-centered '
-                            'inertial frame over time')
+        self.add_input('w_B', shape=(nn, 3), units='rad/s',
+                       desc='Angular velocity of the body frame wrt the inertial frame over time.')
 
-        self.add_input('dt_dstau', shape=(nn,), units=self.options['time_units'])
+        self.add_input('dt_dstau', shape=(nn,), units='s')
 
         # Outputs
-        self.add_output('Odot_BI', shape=(nn, 3, 3), units=f'1/{self.options["time_units"]}',
-                        desc='First time derivative of O_BI over time')
+        self.add_output('wdot_B', shape=(nn, 3), units='rad/s**2',
+                        desc='First time derivative of w_B over time')
 
-    def compute_primal(self, O_BI, dt_dstau):
-        return _compute_OdotBI(O_BI, self._D, dt_dstau)
+    def compute_primal(self, w_B, dt_dstau):
+        return _compute_wdot_B(w_B, self._D, dt_dstau)
