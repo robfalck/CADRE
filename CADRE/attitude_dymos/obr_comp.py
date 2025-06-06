@@ -3,19 +3,21 @@ import jax
 import jax.numpy as jnp
 
 
-def _compute_O_BR(gam):
+def _single_O_BR(gam):
     """
     Return a the transformation matrix from body-fixed to rolled frame.
     """
-    def _single_O_BR(gam):
-        cgam = jnp.cos(gam)
-        sgam = jnp.sin(gam)
-        return jnp.array([
-            [ cgam, sgam, 0.0],
-            [-sgam, cgam, 0.0],
-            [  0.0,  0.0, 1.0]
-        ])
-    return jax.vmap(_single_O_BR)(gam)
+    cgam = jnp.cos(gam)
+    sgam = jnp.sin(gam)
+    return jnp.array([
+        [ cgam, sgam, 0.0],
+        [-sgam, cgam, 0.0],
+        [  0.0,  0.0, 1.0]
+    ])
+
+
+_compute_O_BR = jax.vmap(_single_O_BR)
+""" Vectorized form of the O_BR calculation. """
 
 
 class OBRComp(om.JaxExplicitComponent):
@@ -33,7 +35,7 @@ class OBRComp(om.JaxExplicitComponent):
                        desc='Satellite roll angle over time')
 
         # Outputs
-        self.add_output('O_BR', shape=(nn, 3, 3), units=None,
+        self.add_output('O_BR', shape=(nn, 3, 3), units='unitless',
                         desc='Rotation matrix from body-fixed frame to rolled '
                         'body-fixed frame over time')
 

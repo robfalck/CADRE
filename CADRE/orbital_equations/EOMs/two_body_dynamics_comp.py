@@ -17,10 +17,10 @@ class TwoBodyDynamicsComp(om.ExplicitComponent):
 
         # Modified equinoctial elements
         self.add_input('p', val=np.ones(nn), desc='semi-latus rectum', units=f'DU_{cb}')
-        self.add_input('f', val=np.ones(nn))
-        self.add_input('g', val=np.ones(nn))
-        self.add_input('h', val=np.ones(nn))
-        self.add_input('k', val=np.ones(nn))
+        self.add_input('f', val=np.ones(nn), units='unitless')
+        self.add_input('g', val=np.ones(nn), units='unitless')
+        self.add_input('h', val=np.ones(nn), units='unitless')
+        self.add_input('k', val=np.ones(nn), units='unitless')
         self.add_input('L', val=np.ones(nn), desc='true longitude', units='rad')
 
         # Perturbations
