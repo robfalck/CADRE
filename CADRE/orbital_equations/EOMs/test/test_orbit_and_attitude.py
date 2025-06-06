@@ -9,9 +9,12 @@ from openmdao.utils.testing_utils import use_tempdirs
 
 from CADRE.orbital_equations.EOMs import TwoBodyDynamicsComp
 from CADRE.orbital_equations.frame_conversions import MEEToCart
+from CADRE.attitude_dymos import BodyVelComp, OBRComp, OBIComp, ORIComp, OdotBIComp
+from CADRE.orbital_equations.frame_conversions import StateMuxComp
 
 
-@use_tempdirs
+
+# @use_tempdirs
 class TestOrbitProp(unittest.TestCase):
 
     def test_propagation(self):
@@ -32,22 +35,37 @@ class TestOrbitProp(unittest.TestCase):
                 self.options.declare('num_nodes', types=int)
                 self.options.declare('central_body', types=str)
                 self.options.declare('vectorize_outputs', types=bool, default=False)
+                self.options.declare('grid_data')
 
             def setup(self):
                 nn = self.options['num_nodes']
                 cb = self.options['central_body']
+                gd = self.options['grid_data']
 
+                # Orbit propagation
                 self.add_subsystem('eom', TwoBodyDynamicsComp(num_nodes=nn, central_body=cb), promotes=['*'])
                 self.add_subsystem('mee_to_cart', MEEToCart(num_nodes=nn, central_body=cb), promotes=['*'])
+                self.add_subsystem('state_mux_comp', StateMuxComp(num_nodes=nn), promotes=['*'])
+
+                # Attitude
+                self.add_subsystem('ori_comp', ORIComp(num_nodes=nn), promotes=['*'])
+                self.add_subsystem('obr_comp', OBRComp(num_nodes=nn), promotes=['*'])
+                self.add_subsystem('obi_comp', OBIComp(num_nodes=nn), promotes=['*'])
+                self.add_subsystem('odotbi_comp', OdotBIComp(num_nodes=nn, grid_data=gd), promotes=['*'])
+                self.add_subsystem('body_vel_comp', BodyVelComp(num_nodes=nn), promotes=['*'])
 
         nn = 50
         traj = prob.model.add_subsystem('traj', dm.Trajectory())
+        tx = dm.PicardShooting(num_segments=1, nodes_per_seg=nn, grid_type='lgl')
         orbit = traj.add_phase('orbit', dm.Phase(ode_class=TwoBodyODE,
-                                                 transcription=dm.Birkhoff(num_nodes=nn),
+                                                 transcription=tx,
+                                                #  transcription=dm.Birkhoff(num_nodes=nn),
                                                  ode_init_kwargs={'central_body': 'earth',
-                                                                  'vectorize_outputs': False}))
+                                                                  'vectorize_outputs': False,
+                                                                  'grid_data': tx.grid_data}))
 
-        orbit.set_time_options(fix_initial=True, fix_duration=True, units='TU_earth', initial_val=0.0)
+        orbit.set_time_options(fix_initial=True, fix_duration=True, units='TU_earth', initial_val=0.0,
+                               dt_dstau_targets=['dt_dstau'])
         orbit.add_state('p', fix_initial=True, units='DU_earth', rate_source='p_dot', lower=0.5)
         orbit.add_state('f', fix_initial=True, units='unitless', rate_source='f_dot')
         orbit.add_state('g', fix_initial=True, units='unitless', rate_source='g_dot')
@@ -56,7 +74,7 @@ class TestOrbitProp(unittest.TestCase):
         orbit.add_state('L', fix_initial=True, units='rad', rate_source='L_dot')
         orbit.add_objective('time', loc='final')
 
-        orbit.add_timeseries_output(['x', 'y', 'z', 'vx', 'vy', 'vz'])
+        orbit.add_timeseries_output(['x', 'y', 'z', 'vx', 'vy', 'vz', 'r_e2b_I', 'v_e2b_I', 'v_e2b_B', 'O_BI', 'O_BR', 'O_RI', 'Odot_BI'])
 
         prob.setup()
 
@@ -68,7 +86,7 @@ class TestOrbitProp(unittest.TestCase):
         orbit.set_state_val('k', 0)
         orbit.set_state_val('L', 0)
 
-        dm.run_problem(prob, make_plots=True)
+        dm.run_problem(prob, run_driver=False, make_plots=True)
 
         p = prob.get_val('traj.orbit.timeseries.p')
         f = prob.get_val('traj.orbit.timeseries.f')
@@ -83,6 +101,10 @@ class TestOrbitProp(unittest.TestCase):
         vx = prob.get_val('traj.orbit.timeseries.vx')
         vy = prob.get_val('traj.orbit.timeseries.vy')
         vz = prob.get_val('traj.orbit.timeseries.vz')
+
+        r_e2b_I = prob.get_val('traj.orbit.timeseries.r_e2b_I')
+        v_e2b_I = prob.get_val('traj.orbit.timeseries.v_e2b_I')
+        v_e2b_B = prob.get_val('traj.orbit.timeseries.v_e2b_B')
 
         assert_near_equal(p[0], p[-1], tolerance=1e-6)
 
@@ -99,8 +121,5 @@ class TestOrbitProp(unittest.TestCase):
         assert_near_equal(k, np.zeros((nn, 1)), tolerance=1e-6)
         assert_near_equal(L[-1], 2*np.pi, tolerance=1e-6)
 
-        import matplotlib.pyplot as plt
-
-        plt.plot(x, y, 'o')
-        plt.show()
-
+if __name__ == '__main__':
+    unittest.main()
