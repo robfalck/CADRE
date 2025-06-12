@@ -40,7 +40,7 @@ class AttitudeTorqueComp(om.JaxExplicitComponent):
                        desc='Angular acceleration of the body frame wrt the inertial frame.')
 
         # Outputs
-        self.add_output('T_req', shape=(nn, 3), units='unitless',
+        self.add_output('T_req', shape=(nn, 3), units='N*m',
                         desc='Required torque vectory in the body frame.')
 
     def get_self_statics(self):

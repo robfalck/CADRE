@@ -19,10 +19,10 @@ class ReactionWheel(om.JaxExplicitComponent):
         n = self.options['num_nodes']
 
         # Inputs
-        self.add_input('w_B', shape=(n, 3), units='1/s',
+        self.add_input('w_B', shape=(n, 3), units='rad/s',
                        desc='Angular velocity vector in body-fixed frame over time')
 
-        self.add_input('w_RW', shape=(n, 3), units='1/s',
+        self.add_input('w_RW', shape=(n, 3), units='rad/s',
                        desc='Angular velocity vector of reaction wheel over time')
 
         self.add_input('T_RW', shape=(n, 3), units='N*m',
@@ -32,7 +32,7 @@ class ReactionWheel(om.JaxExplicitComponent):
         self.add_output('P_RW', shape=(n, 3), units='W',
                         desc='Reaction wheel power over time')
 
-        self.add_output('alpha_RW', shape=(n, 3), units='1/s**2',
+        self.add_output('alpha_RW', shape=(n, 3), units='rad/s**2',
                         desc='Angular acceleration vector of reaction wheel over time')
 
         # unit conversion of some kind

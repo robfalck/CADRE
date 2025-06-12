@@ -12,6 +12,7 @@ from CADRE.orbital_equations.frame_conversions import MEEToCart
 from CADRE.attitude_dymos import AngularAccelerationComp, AngularVelocityComp, AttitudeTorqueComp, \
     BodyVelComp, OBRComp, OBIComp, ORIComp, OdotBIComp
 from CADRE.orbital_equations.frame_conversions import StateMuxComp
+from CADRE.reactionwheel_dymos import ReactionWheel
 
 
 
@@ -58,6 +59,9 @@ class TestOrbitProp(unittest.TestCase):
                 self.add_subsystem('body_vel_comp', BodyVelComp(num_nodes=nn), promotes=['*'])
                 self.add_subsystem('torque_req_comp', AttitudeTorqueComp(num_nodes=nn), promotes=['*'])
 
+                self.add_subsystem('reactionwheel', ReactionWheel(num_nodes=nn), promotes=['*'])
+                self.connect('T_req', 'T_RW')
+
         nn = 50
         traj = prob.model.add_subsystem('traj', dm.Trajectory())
         tx = dm.PicardShooting(num_segments=1, nodes_per_seg=nn, grid_type='lgl')
@@ -76,11 +80,12 @@ class TestOrbitProp(unittest.TestCase):
         orbit.add_state('h', fix_initial=True, units='unitless', rate_source='h_dot')
         orbit.add_state('k', fix_initial=True, units='unitless', rate_source='k_dot')
         orbit.add_state('L', fix_initial=True, units='rad', rate_source='L_dot')
+        orbit.add_state('w_RW', fix_initial=True, units='rad/s', rate_source='alpha_RW')
         orbit.add_objective('time', loc='final')
 
         orbit.add_timeseries_output(['x', 'y', 'z', 'vx', 'vy', 'vz', 'r_e2b_I',
                                      'v_e2b_I', 'v_e2b_B', 'O_BI', 'O_BR', 'O_RI', 'Odot_BI',
-                                     'w_B', 'wdot_B', 'T_req'])
+                                     'w_B', 'wdot_B', 'T_req', 'P_RW'])
 
         prob.setup()
 
@@ -91,6 +96,7 @@ class TestOrbitProp(unittest.TestCase):
         orbit.set_state_val('h', 0)
         orbit.set_state_val('k', 0)
         orbit.set_state_val('L', 0)
+        orbit.set_state_val('w_RW', [[0,0,0], [0,0,0]])
 
         dm.run_problem(prob, run_driver=False, make_plots=True)
 
