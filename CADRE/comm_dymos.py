@@ -358,131 +358,32 @@ class CommGSLocComp(om.JaxExplicitComponent):
 class CommLOSComp(om.JaxExplicitComp):
     def initialize(self):
         self.options.declare('num_nodes', types=int)
-        self.options.declare('lat', types=float, default=42.2708, desc='Ground station latitude (deg)')
-        self.options.declare('lon', types=float, default=-83.7264, desc='Ground station longitude (deg)')
-        self.options.declare('alt', types=float, default=256., desc='Ground station altitude above mean sea level (m).')
+        self.options.declare('k', types=float, default=100., desc='Sharpness factor for activation function.')
         self.options.declare('r_cb', types=float, default=6378.137E3, desc='Earth radius (m)')
 
     def setup(self):
         nn = self.options['num_nodes']
-        self.add_input('O_IE', shape=(nn, 3, 3), units='unitless',
-                       desc='ECI to ECF transformation matrix')
-        self.add_output('r_e2g_E', shape=(nn, 3), units='m',
-                        desc='Ground station ECEF position vector.')
-        self.add_output('r_e2g_I', shape=(nn, 3), units='m',
-                        desc='Ground station ECI position vector.')
-
-    def get_self_statics(self):
-        # return value must be hashable
-        return self.options['lat'], self.options['lon'], self.options['alt'], self.options['r_cb'],
-
-    def compute_primal(self, O_IE):
-        lat = self.options['lat']
-        lon = self.options['lon']
-        alt = self.options['alt']
-        r_cb = self.options['r_cb']
-        r_e2g_E, r_e2g_I = _compute_los(r_b2g_I, r_e2g_I, r_cb, k=20):)
-        return r_e2g_E, r_e2g_I
-
-
-class Comm_LOS(ExplicitComponent):
-    """
-    Determines if the Satellite has line of sight with the ground stations.
-    """
-
-    # constants
-    Re = 6378.137
-
-    def __init__(self, n):
-        super(Comm_LOS, self).__init__()
-
-        self.n = n
-
-    def setup(self):
-        n = self.n
-
-        # Inputs
-        self.add_input('r_b2g_I', np.zeros((3, n)), units='km',
+        self.add_input('r_b2g_I', shape=(nn, 3), units='km',
                        desc='Position vector from satellite to ground station '
                             'in Earth-centered inertial frame over time')
 
-        self.add_input('r_e2g_I', np.zeros((3, n)), units='km',
+        self.add_input('r_e2g_I', shape=(nn, 3), units='km',
                        desc='Position vector from earth to ground station in '
                             'Earth-centered inertial frame over time')
 
         # Outputs
-        self.add_output('CommLOS', np.zeros(n), units=None,
+        self.add_output('CommLOS', shape=(nn,), units='unitless',
                         desc='Satellite to ground station line of sight over time')
 
-    def compute(self, inputs, outputs):
-        """
-        Calculate outputs.
-        """
-        r_b2g_I = inputs['r_b2g_I']
-        r_e2g_I = inputs['r_e2g_I']
-        CommLOS = outputs['CommLOS']
+    def get_self_statics(self):
+        # return value must be hashable
+        return self.options['k'], self.options['r_cb'],
 
-        Rb = 100.0
-        for i in range(0, self.n):
-            proj = np.dot(r_b2g_I[:, i], r_e2g_I[:, i]) / self.Re
-
-            if proj > 0:
-                CommLOS[i] = 0.
-            elif proj < -Rb:
-                CommLOS[i] = 1.
-            else:
-                x = (proj - 0) / (-Rb - 0)
-                CommLOS[i] = 3 * x ** 2 - 2 * x ** 3
-
-    def compute_partials(self, inputs, partials):
-        """
-        Calculate and save derivatives. (i.e., Jacobian)
-        """
-        r_b2g_I = inputs['r_b2g_I']
-        r_e2g_I = inputs['r_e2g_I']
-
-        self.dLOS_drb = np.zeros((self.n, 3))
-        self.dLOS_dre = np.zeros((self.n, 3))
-
-        Rb = 10.0
-        for i in range(0, self.n):
-
-            proj = np.dot(r_b2g_I[:, i], r_e2g_I[:, i]) / self.Re
-
-            if proj > 0:
-                self.dLOS_drb[i, :] = 0.
-                self.dLOS_dre[i, :] = 0.
-            elif proj < -Rb:
-                self.dLOS_drb[i, :] = 0.
-                self.dLOS_dre[i, :] = 0.
-            else:
-                x = (proj - 0) / (-Rb - 0)
-                dx_dproj = -1. / Rb
-                dLOS_dx = 6 * x - 6 * x ** 2
-                dproj_drb = r_e2g_I[:, i]
-                dproj_dre = r_b2g_I[:, i]
-
-                self.dLOS_drb[i, :] = dLOS_dx * dx_dproj * dproj_drb
-                self.dLOS_dre[i, :] = dLOS_dx * dx_dproj * dproj_dre
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        """
-        Matrix-vector product with the Jacobian.
-        """
-        dCommLOS = d_outputs['CommLOS']
-
-        if mode == 'fwd':
-            for k in range(3):
-                if 'r_b2g_I' in d_inputs:
-                    dCommLOS += self.dLOS_drb[:, k] * d_inputs['r_b2g_I'][k, :]
-                if 'r_e2g_I' in d_inputs:
-                    dCommLOS += self.dLOS_dre[:, k] * d_inputs['r_e2g_I'][k, :]
-        else:
-            for k in range(3):
-                if 'r_b2g_I' in d_inputs:
-                    d_inputs['r_b2g_I'][k, :] += self.dLOS_drb[:, k] * dCommLOS
-                if 'r_e2g_I' in d_inputs:
-                    d_inputs['r_e2g_I'][k, :] += self.dLOS_dre[:, k] * dCommLOS
+    def compute_primal(self, r_b2g_I, r_e2g_I):
+        k = self.options['k']
+        r_cb = self.options['r_cb']
+        r_e2g_E, r_e2g_I = _compute_comm_los(r_b2g_I, r_e2g_I, r_cb, k)
+        return r_e2g_E, r_e2g_I
 
 
 class Comm_VectorAnt(ExplicitComponent):
