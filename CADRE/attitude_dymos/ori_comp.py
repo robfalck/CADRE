@@ -1,68 +1,58 @@
-import openmdao.api as om
 import jax.numpy as jnp
-import jax
+from pydantic import Field
+
+from om4.api import InputVar, JaxExplicitComp, OutputVar
 
 
-def _single_O_RI(r, v):
+def _compute_O_RI(r, v):
     """
-    Return a the transformation matrix from the rolled frame to the inertial frame.
+    Return the transformation matrix from the rolled frame to the inertial frame.
 
     Parameters
     ----------
-    r : array-like
-        Inertial planet-to-spacecraft position vector.
-    v : array_like
+    r : array-like (3, n)
+        Inertial planet-to-spacecraft position vector at n points in time.
+    v : array_like (3, n)
         Inertial planet-to-spacecraft velocity vector, expressed in the inertial frame.
 
     Returns
     -------
-    O_RI : array-like
-        Transformation matrix to transform from the rolled frame to the inertial frame.
+    O_RI : array-like (3, 3, n)
+        Transformation matrix to transform from the rolled frame to the inertial frame,
+        ``x_I = O_RI x_R``. Its columns are the rolled axes expressed in the inertial frame.
     """
-    rmag = jnp.sqrt(jnp.dot(r, r))
-    vmag = jnp.sqrt(jnp.dot(v, v))
+    # sqrt(sum(x**2)) rather than norm, which takes abs() and so is not complex-step safe.
+    r_norm = r / jnp.sqrt(jnp.sum(r**2, axis=0))
+    v_norm = v / jnp.sqrt(jnp.sum(v**2, axis=0))
 
-    r_norm = r / rmag
-    v_norm = v / vmag
+    # iB = v_norm x r_norm, jB = -v_norm x iB
+    iB = jnp.cross(v_norm, r_norm, axis=0)
+    jB = -jnp.cross(v_norm, iB, axis=0)
 
-    vx = jnp.array([[       0.0, -v_norm[2],  v_norm[1]],
-                    [ v_norm[2],         0., -v_norm[0]],
-                    [-v_norm[1],  v_norm[0],         0.]])
-
-    iB = jnp.dot(vx, r_norm)
-    jB = -jnp.dot(vx, iB)
-
-    return jnp.vstack((iB, jB, -v_norm))
+    return jnp.stack((iB, jB, -v_norm), axis=1)
 
 
-_compute_O_RI = jax.vmap(_single_O_RI, in_axes=(0, 0))
-""" Vectorized form of the calculation of O_RI. """
-
-
-class ORIComp(om.JaxExplicitComponent):
+class ORIComp(JaxExplicitComp):
     """
-    Coordinate transformation from the interial plane to the rolled
-    (forward facing) plane.
+    Coordinate transformation from the rolled (forward facing) frame to the inertial frame.
     """
+    num_nodes: int = Field(default=1)
 
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
+    inputs: dict[str, InputVar] = {
+        'r_e2b_I': InputVar(shape=(3, 'num_nodes'), units='km',
+                            desc='Position vector from earth to satellite in '
+                                 'Earth-centered inertial frame over time'),
+        'v_e2b_I': InputVar(shape=(3, 'num_nodes'), units='km/s',
+                            desc='Velocity vector from earth to satellite in '
+                                 'Earth-centered inertial frame over time'),
+    }
 
-    def setup(self):
-        nn = self.options['num_nodes']
+    outputs: dict[str, OutputVar] = {
+        'O_RI': OutputVar(shape=(3, 3, 'num_nodes'), units='unitless',
+                          desc='Rotation matrix from rolled body-fixed frame to '
+                               'Earth-centered inertial frame over time'),
+    }
 
-        # Inputs
-        self.add_input('r_e2b_I', shape=(nn, 3), units='km',
-                       desc='Position vector from earth to satellite in '
-                            'Earth-centered inertial frame over time')
-        self.add_input('v_e2b_I', shape=(nn, 3), units='km/s',
-                       desc='Velocity vector from earth to satellite in '
-                            'Earth-centered inertial frame over time')
-
-        # Outputs
-        self.add_output('O_RI', shape=(nn, 3, 3), units='unitless',
-                        desc='Rotation matrix from rolled body-fixed frame to '
-                             'Earth-centered inertial frame over time')
-
-    def compute_primal(self, r_e2b_I, v_e2b_I):
-        return _compute_O_RI(r_e2b_I, v_e2b_I)
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
+        outputs['O_RI'] = _compute_O_RI(inputs['r_e2b_I'], inputs['v_e2b_I'])

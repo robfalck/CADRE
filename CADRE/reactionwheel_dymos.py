@@ -1,63 +1,52 @@
-import openmdao.api as om
 import jax.numpy as jnp
-import jax.debug
+from pydantic import Field
 
-class ReactionWheel(om.JaxExplicitComponent):
+from om4.api import InputVar, JaxExplicitComp, OutputVar
+
+
+class ReactionWheel(JaxExplicitComp):
     """
     Compute reaction wheel power.
     """
     # constants
-    V = 4.0
-    a = 4.9e-4
-    b = 4.5e2
-    I0 = 0.017
+    V: float = 4.0
+    a: float = 4.9e-4
+    b: float = 4.5e2
+    I0: float = 0.017
+    J_RW: float = 2.8e-5
 
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
+    num_nodes: int = Field(default=1)
 
-    def setup(self):
-        n = self.options['num_nodes']
+    inputs: dict[str, InputVar] = {
+        'w_B': InputVar(shape=(3, 'num_nodes'), val=0.0, units='rad/s',
+                        desc='Angular velocity vector in body-fixed frame over time'),
+        'w_RW': InputVar(shape=(3, 'num_nodes'), units='rad/s',
+                         desc='Angular velocity vector of reaction wheel over time',
+                         tags={'dymos.state_target:w_RW'}),
+        'T_RW': InputVar(shape=(3, 'num_nodes'), val=0.0, units='N*m',
+                         desc='Torque vector of reaction wheel over time'),
+    }
 
-        # Inputs
-        self.add_input('w_B', shape=(n, 3), units='rad/s',
-                       desc='Angular velocity vector in body-fixed frame over time')
+    outputs: dict[str, OutputVar] = {
+        'P_RW': OutputVar(shape=(3, 'num_nodes'), units='W',
+                          desc='Reaction wheel power over time'),
+        'alpha_RW': OutputVar(shape=(3, 'num_nodes'), units='rad/s**2',
+                              desc='Angular acceleration vector of reaction wheel over time',
+                              tags={'dymos.state_rate_source:w_RW', 'dymos.state_units:rad/s'}),
+    }
 
-        self.add_input('w_RW', shape=(n, 3), units='rad/s',
-                       desc='Angular velocity vector of reaction wheel over time')
+    def get_self_statics(self):
+        return {'V': self.V, 'a': self.a, 'b': self.b, 'I0': self.I0, 'J_RW': self.J_RW}
 
-        self.add_input('T_RW', shape=(n, 3), units='N*m',
-                       desc='Torque vector of reaction wheel over time')
-
-        # Outputs
-        self.add_output('P_RW', shape=(n, 3), units='W',
-                        desc='Reaction wheel power over time')
-
-        self.add_output('alpha_RW', shape=(n, 3), units='rad/s**2',
-                        desc='Angular acceleration vector of reaction wheel over time')
-
-        # unit conversion of some kind
-        self.J_RW = 2.8e-5
-
-    def compute_primal(self, w_B, w_RW, T_RW):
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
         """
         Calculate outputs.
         """
-        P_RW0 = (self.V * (self.a * w_RW[:, 0] +
-                          self.b * T_RW[:, 0])**2 +
-                          self.V * self.I0)
-        P_RW1 = (self.V * (self.a * w_RW[:, 1] +
-                          self.b * T_RW[:, 1])**2 +
-                          self.V * self.I0)
-        P_RW2 = (self.V * (self.a * w_RW[:, 2] +
-                          self.b * T_RW[:, 2])**2 +
-                          self.V * self.I0)
+        w_B = inputs['w_B']
+        w_RW = inputs['w_RW']
+        T_RW = inputs['T_RW']
 
-        P_RW = jnp.vstack((P_RW0, P_RW1, P_RW2))
-
-        a2 = jnp.vstack((-w_B[:,2]*w_RW[:,1] + w_B[:,1]*w_RW[:,2],
-                          w_B[:,2]*w_RW[:,0] - w_B[:,0]*w_RW[:,2],
-                         -w_B[:,1]*w_RW[:,0] + w_B[:,0]*w_RW[:,1]))
-
-        alpha_RW = -T_RW / self.J_RW - a2.T
-
-        return P_RW, alpha_RW
+        V = statics['V']
+        outputs['P_RW'] = V * (statics['a'] * w_RW + statics['b'] * T_RW)**2 + V * statics['I0']
+        outputs['alpha_RW'] = -T_RW / statics['J_RW'] - jnp.cross(w_B, w_RW, axis=0)

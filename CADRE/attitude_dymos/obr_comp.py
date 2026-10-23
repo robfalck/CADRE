@@ -1,43 +1,51 @@
-import openmdao.api as om
-import jax
 import jax.numpy as jnp
+from pydantic import Field
+
+from om4.api import InputVar, JaxExplicitComp, OutputVar
 
 
-def _single_O_BR(gam):
+def _compute_O_BR(gamma):
     """
-    Return a the transformation matrix from body-fixed to rolled frame.
+    Return the transformation matrix from body-fixed to rolled frame at each node.
+
+    ``x_R = O_BR x_B``, so the columns of O_BR are the body axes expressed in the rolled frame.
+
+    Parameters
+    ----------
+    gamma : array-like (n,)
+        Roll angle at n points in time.
+
+    Returns
+    -------
+    O_BR : array-like (3, 3, n)
+        Component-major rotation matrices, node axis last.
     """
-    cgam = jnp.cos(gam)
-    sgam = jnp.sin(gam)
-    return jnp.array([
-        [ cgam, sgam, 0.0],
-        [-sgam, cgam, 0.0],
-        [  0.0,  0.0, 1.0]
-    ])
+    cgam = jnp.cos(gamma)
+    sgam = jnp.sin(gamma)
+    z = jnp.zeros_like(gamma)
+    o = jnp.ones_like(gamma)
+    return jnp.stack([jnp.stack([cgam, -sgam, z]),
+                      jnp.stack([sgam, cgam, z]),
+                      jnp.stack([z, z, o])])
 
 
-_compute_O_BR = jax.vmap(_single_O_BR)
-""" Vectorized form of the O_BR calculation. """
-
-
-class OBRComp(om.JaxExplicitComponent):
+class OBRComp(JaxExplicitComp):
     """
     Calculates the body-fixed orientation matrix.
     """
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
+    num_nodes: int = Field(default=1)
 
-    def setup(self):
-        nn = self.options['num_nodes']
+    inputs: dict[str, InputVar] = {
+        'gamma': InputVar(shape=('num_nodes',), units='rad',
+                          desc='Satellite roll angle over time'),
+    }
 
-        # Inputs
-        self.add_input('gamma', shape=(nn,), units='rad',
-                       desc='Satellite roll angle over time')
+    outputs: dict[str, OutputVar] = {
+        'O_BR': OutputVar(shape=(3, 3, 'num_nodes'), units='unitless',
+                          desc='Rotation matrix from body-fixed frame to rolled '
+                               'body-fixed frame over time'),
+    }
 
-        # Outputs
-        self.add_output('O_BR', shape=(nn, 3, 3), units='unitless',
-                        desc='Rotation matrix from body-fixed frame to rolled '
-                        'body-fixed frame over time')
-
-    def compute_primal(self, gamma):
-        return _compute_O_BR(gamma)
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
+        outputs['O_BR'] = _compute_O_BR(inputs['gamma'])

@@ -1,36 +1,40 @@
-import numpy as np
-import openmdao.api as om
-import CADRE.orbital_equations
-from openmdao.utils.cs_safe import arctan2
+import jax.numpy as jnp
+from pydantic import Field
+
+from om4.api import InputVar, JaxExplicitComp, OutputVar
+
+from CADRE.orbital_equations import CentralBody, set_body_units
+
+_UNITS = {'p': 'DU', 'f': 'unitless', 'g': 'unitless', 'h': 'unitless', 'k': 'unitless',
+          'L': 'rad', 'sma': 'DU', 'ecc': 'unitless', 'inc': 'rad', 'aop': 'rad', 'raan': 'rad',
+          'ta': 'rad'}
 
 
-class MEEToKep(om.ExplicitComponent):
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
-        self.options.declare('central_body', values=('earth', 'sun', 'moon'))
+class MEEToKep(JaxExplicitComp):
+    """
+    Convert modified equinoctial elements to classical Keplerian elements.
 
-    def setup(self):
-        nn = self.options['num_nodes']
-        cb = self.options['central_body']
+    The original declared the eccentricity in DU and the angles in DU/TU; they are unitless and
+    radians here.
+    """
+    num_nodes: int = Field(default=1)
+    central_body: CentralBody = Field(default='earth')
 
-        self.add_input('p', val=np.ones(nn), units=f'DU_{cb}')
-        self.add_input('f', val=np.ones(nn))
-        self.add_input('g', val=np.ones(nn))
-        self.add_input('h', val=np.ones(nn))
-        self.add_input('k', val=np.ones(nn))
-        self.add_input('L', val=np.ones(nn), units='rad')
+    inputs: dict[str, InputVar] = {
+        name: InputVar(shape=('num_nodes',), val=1.0) for name in ('p', 'f', 'g', 'h', 'k', 'L')
+    }
 
-        self.add_output('sma', val=np.ones(nn), units=f'DU_{cb}')
-        self.add_output('ecc', val=np.ones(nn), units=f'DU_{cb}')
-        self.add_output('inc', val=np.ones(nn), units=f'DU_{cb}')
-        self.add_output('aop', val=np.ones(nn), units=f'DU_{cb}/TU_{cb}')
-        self.add_output('raan', val=np.ones(nn), units=f'DU_{cb}/TU_{cb}')
-        self.add_output('ta', val=np.ones(nn), units=f'DU_{cb}/TU_{cb}')
+    outputs: dict[str, OutputVar] = {
+        name: OutputVar(shape=('num_nodes',))
+        for name in ('sma', 'ecc', 'inc', 'aop', 'raan', 'ta')
+    }
 
-        self.declare_partials(of='*', wrt='*', method='cs')
-        self.declare_coloring(wrt='*', method='cs', show_summary=True)
+    def model_post_init(self, context, /):
+        super().model_post_init(context)
+        set_body_units(self, _UNITS)
 
-    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
         p = inputs['p']
         f = inputs['f']
         g = inputs['g']
@@ -39,13 +43,8 @@ class MEEToKep(om.ExplicitComponent):
         L = inputs['L']
 
         outputs['sma'] = p / (1 - f**2 - g**2)
-
-        outputs['ecc'] = np.sqrt(f**2 + g**2)
-
-        outputs['inc'] = arctan2(2*np.sqrt(h**2+k**2), 1-h**2-k**2)
-
-        outputs['raan'] = arctan2(k, h)
-
-        outputs['aop'] = arctan2(g*h-f*k, f*h+g*k)
-
-        outputs['ta'] = L - arctan2(g, f)
+        outputs['ecc'] = jnp.sqrt(f**2 + g**2)
+        outputs['inc'] = jnp.arctan2(2*jnp.sqrt(h**2+k**2), 1-h**2-k**2)
+        outputs['raan'] = jnp.arctan2(k, h)
+        outputs['aop'] = jnp.arctan2(g*h-f*k, f*h+g*k)
+        outputs['ta'] = L - jnp.arctan2(g, f)

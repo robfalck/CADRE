@@ -1,26 +1,24 @@
-import openmdao.api as om
 import jax.numpy as jnp
+from pydantic import Field
+
+from om4.api import InputVar, JaxExplicitComp, OutputVar
 
 
-class StateMuxComp(om.JaxExplicitComponent):
+class StateMuxComp(JaxExplicitComp):
+    """Stack the Cartesian components into component-major (3, n) position and velocity."""
+    num_nodes: int = Field(default=1)
 
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
+    inputs: dict[str, InputVar] = {
+        **{name: InputVar(shape=('num_nodes',), units='km') for name in ('x', 'y', 'z')},
+        **{name: InputVar(shape=('num_nodes',), units='km/s') for name in ('vx', 'vy', 'vz')},
+    }
 
-    def setup(self):
-        nn = self.options['num_nodes']
-        self.add_input('x', shape=(nn,), units='km')
-        self.add_input('y', shape=(nn,), units='km')
-        self.add_input('z', shape=(nn,), units='km')
-        self.add_input('vx', shape=(nn,), units='km/s')
-        self.add_input('vy', shape=(nn,), units='km/s')
-        self.add_input('vz', shape=(nn,), units='km/s')
+    outputs: dict[str, OutputVar] = {
+        'r_e2b_I': OutputVar(shape=(3, 'num_nodes'), units='km'),
+        'v_e2b_I': OutputVar(shape=(3, 'num_nodes'), units='km/s'),
+    }
 
-        self.add_output('r_e2b_I', shape=(nn, 3), units='km')
-        self.add_output('v_e2b_I', shape=(nn, 3), units='km/s')
-
-    def compute_primal(self, x, y, z, vx, vy, vz):
-        r_e2b_I = jnp.hstack((x[:, jnp.newaxis], y[:, jnp.newaxis], z[:, jnp.newaxis]))
-        v_e2b_I = jnp.hstack((vx[:, jnp.newaxis], vy[:, jnp.newaxis], vz[:, jnp.newaxis]))
-        return r_e2b_I, v_e2b_I
-
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
+        outputs['r_e2b_I'] = jnp.stack((inputs['x'], inputs['y'], inputs['z']))
+        outputs['v_e2b_I'] = jnp.stack((inputs['vx'], inputs['vy'], inputs['vz']))

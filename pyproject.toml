@@ -1,11 +1,11 @@
 [build-system]
-requires = ["hatchling", "numpy>=2.0"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
 name = "CADRE"
 dynamic = ["version"]
-description = "Implementation of the CADRE CubeSat design problem for OpenMDAO 2.x"
+description = "Implementation of the CADRE CubeSat design problem for OpenMDAO 4 and dymos4"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
@@ -23,12 +23,12 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
+# om4 and dymos4 are not on PyPI yet; pixi.toml installs them from sibling
+# checkouts.
 dependencies = [
     "jax",
-    "dymos>=1.13",
-    "numpy<2.0",
-    "openmdao>=2.3",
-    "six",
+    "numpy>=2.0",
+    "scipy",
 ]
 
 [tool.hatch.metadata]
@@ -57,3 +57,14 @@ path = "CADRE/__init__.py"
 include = [
     "/CADRE",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F"]
+# O is the conventional name for the orientation matrices here.
+ignore = ["E741"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]

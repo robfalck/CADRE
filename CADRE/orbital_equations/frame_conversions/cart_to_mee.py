@@ -1,61 +1,82 @@
-import numpy as np
-import openmdao.api as om
-import CADRE.orbital_equations
-from openmdao.utils.cs_safe import arctan2
+import jax.numpy as jnp
+from pydantic import Field
+
+from om4.api import InputVar, JaxExplicitComp, OutputVar
+
+from CADRE.orbital_equations import CentralBody, set_body_units
+
+_UNITS = {'x': 'DU', 'y': 'DU', 'z': 'DU', 'vx': 'DU/TU', 'vy': 'DU/TU', 'vz': 'DU/TU',
+          'p': 'DU', 'f': 'unitless', 'g': 'unitless', 'h': 'unitless', 'k': 'unitless',
+          'L': 'rad'}
 
 
-class CartesianToMEE(om.ExplicitComponent):
+def cart_to_mee(x, y, z, vx, vy, vz):
+    """
+    Return the modified equinoctial elements for a Cartesian position and velocity (mu = 1).
 
-    def initialize(self):
-        self.options.declare('num_nodes', types=int, default=1)
-        self.options.declare('central_body', values=('earth', 'sun', 'moon'))
+    Parameters
+    ----------
+    x, y, z, vx, vy, vz : array-like (n,)
+        Cartesian position and velocity.
 
-    def setup(self):
-        nn = self.options['num_nodes']
-        cb = self.options['central_body']
+    Returns
+    -------
+    tuple of array-like (n,)
+        ``(p, f, g, h, k, L)``.
+    """
+    r_vec = jnp.stack((x, y, z))
+    v_vec = jnp.stack((vx, vy, vz))
+    h_vec = jnp.cross(r_vec, v_vec, axis=0)
+    hx, hy, hz = h_vec
+    h_norm = jnp.sqrt(jnp.sum(h_vec**2, axis=0))
+    r = jnp.sqrt(jnp.sum(r_vec**2, axis=0))
+    v_sq = jnp.sum(v_vec**2, axis=0)
 
-        self.add_input('x', val=np.ones(nn), units=f'DU_{cb}')
-        self.add_input('y', val=np.ones(nn), units=f'DU_{cb}')
-        self.add_input('z', val=np.ones(nn), units=f'DU_{cb}')
-        self.add_input('vx', val=np.ones(nn), units=f'DU_{cb}/TU_{cb}')
-        self.add_input('vy', val=np.ones(nn), units=f'DU_{cb}/TU_{cb}')
-        self.add_input('vz', val=np.ones(nn), units=f'DU_{cb}/TU_{cb}')
+    e_vec = (v_sq - 1 / r) * r_vec - jnp.sum(r_vec * v_vec, axis=0) * v_vec
 
-        self.add_output('p', val=np.ones(nn), units=f'DU_{cb}')
-        self.add_output('f', val=np.ones(nn))
-        self.add_output('g', val=np.ones(nn))
-        self.add_output('h', val=np.ones(nn))
-        self.add_output('k', val=np.ones(nn))
-        self.add_output('L', val=np.ones(nn), desc='true longitude', units='rad')
+    # The direction of the ascending node, and the in-plane unit vector 90 degrees ahead of it.
+    hk_denom = h_norm + hz
+    h = -hy / hk_denom
+    k = hx / hk_denom
 
-        self.declare_partials(of='*', wrt='*', method='cs')
-        self.declare_coloring(wrt='*', method='cs', show_summary=True)
+    # The equinoctial frame's in-plane unit vectors f_hat and g_hat.
+    s_sq = 1 + h**2 + k**2
+    f_hat = jnp.stack((1 - k**2 + h**2, 2 * h * k, -2 * k)) / s_sq
+    g_hat = jnp.stack((2 * h * k, 1 + k**2 - h**2, 2 * h)) / s_sq
 
-    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-        x = inputs['x']
-        y = inputs['y']
-        z = inputs['z']
-        vx = inputs['vx']
-        vy = inputs['vy']
-        vz = inputs['vz']
+    p = h_norm**2
+    f = jnp.sum(e_vec * f_hat, axis=0)
+    g = jnp.sum(e_vec * g_hat, axis=0)
+    L = jnp.arctan2(jnp.sum(r_vec * g_hat, axis=0), jnp.sum(r_vec * f_hat, axis=0))
+    return p, f, g, h, k, L
 
-        hx = y*vz - z*vy
-        hy = z*vx - x*vz
-        hz = x*vy - y*vx
-        h_norm = np.sqrt(hx**2 + hy**2 + hz**2)
-        r = np.sqrt(x**2 + y**2 + z**2)
-        v = np.sqrt(vx**2 + vy**2 + vz**2)
 
-        e_vec = ((v**2 - 1 / r) * r - (x*vx + y*vy + z*vz) * v)
-        e = np.linalg.norm(e_vec)
+class CartesianToMEE(JaxExplicitComp):
+    """
+    Convert a Cartesian position and velocity to modified equinoctial elements.
 
-        i = np.arccos(hz/h_norm)
-        Omega = arctan2(hx, -hy)
-        omega = arctan2(e_vec[2], e_vec[0] * np.cos(Omega) + e_vec[1] * np.sin(Omega))
+    The original version of this component computed the eccentricity vector from the position
+    and speed magnitudes rather than the vectors, and normed it over all nodes at once. This
+    version uses the standard equinoctial-frame projections, so that it inverts MEEToCart.
+    """
+    num_nodes: int = Field(default=1)
+    central_body: CentralBody = Field(default='earth')
 
-        outputs['p'] = h_norm**2
-        outputs['f'] = e * np.cos(omega + Omega)
-        outputs['g'] = e * np.sin(omega + Omega)
-        outputs['h'] = np.tan(i/2) * np.cos(Omega)
-        outputs['k'] = np.tan(i/2) * np.sin(Omega)
-        outputs['L'] = arctan2(y, x)
+    inputs: dict[str, InputVar] = {
+        name: InputVar(shape=('num_nodes',), val=1.0) for name in ('x', 'y', 'z', 'vx', 'vy', 'vz')
+    }
+
+    outputs: dict[str, OutputVar] = {
+        name: OutputVar(shape=('num_nodes',)) for name in ('p', 'f', 'g', 'h', 'k', 'L')
+    }
+
+    def model_post_init(self, context, /):
+        super().model_post_init(context)
+        set_body_units(self, _UNITS)
+        self.outputs['L'].desc = 'true longitude'
+
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
+        mee = cart_to_mee(*(inputs[name] for name in ('x', 'y', 'z', 'vx', 'vy', 'vz')))
+        for name, val in zip(('p', 'f', 'g', 'h', 'k', 'L'), mee):
+            outputs[name] = val

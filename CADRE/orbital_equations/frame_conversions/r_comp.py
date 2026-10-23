@@ -1,30 +1,36 @@
 import numpy as np
-import openmdao.api as om
-import CADRE.orbital_equations
+from pydantic import Field
+
+from om4.api import ExplicitComponent, InputVar, OutputVar, PartialsSpec
+
+from CADRE.orbital_equations import CentralBody, set_body_units
 
 
-class RComp(om.ExplicitComponent):
+class RComp(ExplicitComponent):
+    num_nodes: int = Field(default=1)
+    central_body: CentralBody = Field(default='earth')
 
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
-        self.options.declare('central_body', values=('earth', 'sun', 'moon'))
+    inputs: dict[str, InputVar] = {
+        'p': InputVar(shape=('num_nodes',), val=1.0, desc='semi-latus rectum'),
+        'f': InputVar(shape=('num_nodes',), val=1.0),
+        'g': InputVar(shape=('num_nodes',), val=1.0),
+        'L': InputVar(shape=('num_nodes',), val=1.0, desc='true longitude'),
+    }
 
-    def setup(self):
-        nn = self.options['num_nodes']
-        cb = self.options['central_body']
+    outputs: dict[str, OutputVar] = {
+        'r': OutputVar(shape=('num_nodes',), val=1.0, desc='geocentric radius'),
+    }
 
-        self.add_input('p', val=np.ones(nn), desc='semi-latus rectum', units=f'DU_{cb}')
-        self.add_input('f', val=np.ones(nn))
-        self.add_input('g', val=np.ones(nn))
-        self.add_input('L', val=np.ones(nn), desc='true longitude', units='rad')
+    partials: list[PartialsSpec] = [
+        PartialsSpec(of='r', wrt=wrt, diagonal=True) for wrt in ('p', 'f', 'g', 'L')
+    ]
 
-        self.add_output('r', val=np.ones(nn), desc='geocentric radius', units=f'DU_{cb}')
+    def model_post_init(self, context, /):
+        super().model_post_init(context)
+        set_body_units(self, {'p': 'DU', 'f': 'unitless', 'g': 'unitless', 'L': 'rad',
+                              'r': 'DU'})
 
-        ar = np.arange(nn, dtype=int)
-        self.declare_partials(of='r', wrt=['p', 'f', 'g'], rows=ar, cols=ar)
-        self.declare_partials(of='r', wrt='L', rows=ar, cols=ar)
-
-    def compute(self, inputs, outputs):
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         p = inputs['p']
         f = inputs['f']
         g = inputs['g']
@@ -42,5 +48,3 @@ class RComp(om.ExplicitComponent):
         partials['r', 'f'] = -p * np.cos(L) / ((1 + f * np.cos(L) + g * np.sin(L)) ** 2)
         partials['r', 'g'] = -p * np.sin(L) / ((1 + f * np.cos(L) + g * np.sin(L)) ** 2)
         partials['r', 'L'] = p * (f * np.sin(L) - g * np.cos(L)) / ((1 + f * np.cos(L) + g * np.sin(L)) ** 2)
-
-

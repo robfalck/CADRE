@@ -1,51 +1,55 @@
-import openmdao.api as om
-import jax
 import jax.numpy as jnp
+import numpy as np
+from pydantic import Field
+
+from om4.api import InputVar, JaxExplicitComp, OutputVar
 
 
-def _single_torque(w_B, wdot_B, J):
+#: Moment of inertia of the spacecraft, kg*m**2.
+J = np.array([[0.018, 0.000, 0.000],
+              [0.000, 0.018, 0.000],
+              [0.000, 0.000, 0.006]])
+
+
+def _compute_torque_req(w_B, wdot_B, J):
     """
     Return the torque required given the angular velocity and angular acceleration.
+
+    Parameters
+    ----------
+    w_B : array-like (3, n)
+        Angular velocity of the body frame.
+    wdot_B : array-like (3, n)
+        Angular acceleration of the body frame.
+    J : array-like (3, 3)
+        Moment of inertia of the spacecraft.
+
+    Returns
+    -------
+    T_req : array-like (3, n)
+        Required torque, J wdot + w x (J w).
     """
-    wx = jnp.array([[ 0.0000,-w_B[2], w_B[1]],
-                    [ w_B[2], 0.0000, -w_B[0]],
-                    [-w_B[1], w_B[0], 0.0000]])
-    return jnp.dot(J, wdot_B) + jnp.dot(wx, jnp.dot(J, w_B))
+    return J @ wdot_B + jnp.cross(w_B, J @ w_B, axis=0)
 
 
-_compute_torque_req = jax.vmap(_single_torque, in_axes=(0, 0, None))
-""" Vectorized form of the O_BR calculation. """
-
-
-class AttitudeTorqueComp(om.JaxExplicitComponent):
+class AttitudeTorqueComp(JaxExplicitComp):
     """
     Calculate the torque required given the angular velocity and its rate.
     """
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
+    num_nodes: int = Field(default=1)
 
-        self._J = jnp.array([[0.018, 0.000, 0.000],
-                             [0.000, 0.018, 0.000],
-                             [0.000, 0.000, 0.006]])
+    inputs: dict[str, InputVar] = {
+        'w_B': InputVar(shape=(3, 'num_nodes'), units='rad/s',
+                        desc='Angular velocity of the body frame wrt the inertial frame.'),
+        'wdot_B': InputVar(shape=(3, 'num_nodes'), units='rad/s**2',
+                           desc='Angular acceleration of the body frame wrt the inertial frame.'),
+    }
 
+    outputs: dict[str, OutputVar] = {
+        'T_req': OutputVar(shape=(3, 'num_nodes'), units='N*m',
+                           desc='Required torque vector in the body frame.'),
+    }
 
-    def setup(self):
-        nn = self.options['num_nodes']
-
-        # Inputs
-        self.add_input('w_B', shape=(nn, 3), units='rad/s',
-                       desc='Angular velocity of the body frame wrt the inertial frame.')
-
-        self.add_input('wdot_B', shape=(nn, 3), units='rad/s**2',
-                       desc='Angular acceleration of the body frame wrt the inertial frame.')
-
-        # Outputs
-        self.add_output('T_req', shape=(nn, 3), units='N*m',
-                        desc='Required torque vectory in the body frame.')
-
-    def get_self_statics(self):
-        # return value must be hashable
-        return self._J,
-
-    def compute_primal(self, w_B, wdot_B):
-        return _compute_torque_req(w_B, wdot_B, self._J)
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
+        outputs['T_req'] = _compute_torque_req(inputs['w_B'], inputs['wdot_B'], J)

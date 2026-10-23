@@ -1,30 +1,32 @@
-import openmdao.api as om
 import jax.numpy as jnp
+from pydantic import Field
+
+from om4.api import InputVar, JaxExplicitComp, OutputVar
 
 
-class OBIComp(om.JaxExplicitComponent):
+class OBIComp(JaxExplicitComp):
     """
     Calculate the transformation matrix from the body frame to the inertial frame.
+
+    ``x_I = O_RI x_R = O_RI O_BR x_B``, so ``O_BI = O_RI O_BR``.
     """
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
+    num_nodes: int = Field(default=1)
 
-    def setup(self):
-        nn = self.options['num_nodes']
+    inputs: dict[str, InputVar] = {
+        'O_BR': InputVar(shape=(3, 3, 'num_nodes'), units='unitless',
+                         desc='Rotation matrix from body-fixed frame to rolled '
+                              'body-fixed frame over time'),
+        'O_RI': InputVar(shape=(3, 3, 'num_nodes'), units='unitless',
+                         desc='Rotation matrix from rolled body-fixed '
+                              'frame to Earth-centered inertial frame over time'),
+    }
 
-        # Inputs
-        self.add_input('O_BR', shape=(nn, 3, 3), units='unitless',
-                       desc='Rotation matrix from body-fixed frame to rolled '
-                       'body-fixed frame over time')
+    outputs: dict[str, OutputVar] = {
+        'O_BI': OutputVar(shape=(3, 3, 'num_nodes'), units='unitless',
+                          desc='Rotation matrix from body-fixed frame to '
+                               'Earth-centered inertial frame over time'),
+    }
 
-        self.add_input('O_RI',  shape=(nn, 3, 3), units='unitless',
-                       desc='Rotation matrix from rolled body-fixed '
-                       'frame to Earth-centered inertial frame over time')
-
-        # Outputs
-        self.add_output('O_BI',  shape=(nn, 3, 3), units='unitless',
-                        desc='Rotation matrix from body-fixed frame to '
-                        'Earth-centered inertial frame over time')
-
-    def compute_primal(self, O_BR, O_RI):
-        return jnp.einsum('nij,njk->nik', O_BR, O_RI)
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
+        outputs['O_BI'] = jnp.einsum('ijn,jkn->ikn', inputs['O_RI'], inputs['O_BR'])

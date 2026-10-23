@@ -74,3 +74,16 @@ SNOPT_summary.out
 
 # Testing
 shelve_test.*
+
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# om4 / dymos4 outputs
+**/reports
+**/coloring_files
+*_out/
+
+# Optimizer and test-runner output
+IPOPT.out
+testflo_report.out

@@ -1,49 +1,55 @@
-import openmdao.api as om
-import jax
 import jax.numpy as jnp
+from pydantic import Field
+
+from om4.api import InputVar, JaxExplicitComp, OutputVar
 
 
-def _single_angular_velocity(O_BI, Odot_BI):
+def _compute_angular_velocity(O_BI, Odot_BI):
     """
-    Return a the transformation matrix from the rolled frame to the inertial frame.
+    Return the angular velocity of the body frame wrt the inertial frame.
 
     Parameters
     ----------
-    O_BI : array-like (3, 3)
+    O_BI : array-like (3, 3, n)
         The transformation matrix from the body to the inertial frame at n points in time.
-    Odot_BI : array-like (3, 3)
+    Odot_BI : array-like (3, 3, n)
         The time rate of change of O_BI.
+
+    Returns
+    -------
+    w_B : array-like (3, n)
+        Angular velocity of the body frame, in the body frame.
+
+    Notes
+    -----
+    O_BI takes body vectors into the inertial frame, so ``Odot_BI = O_BI [w_B x]`` and
+    ``[w_B x] = O_BI^T Odot_BI``. The original CADRE took the rows of ``Odot_BI O_BI^T``
+    instead, which is the negative of w_B when O_BI is read as inertial-to-body, as the original
+    did everywhere else.
     """
-    return jnp.vstack((jnp.dot(Odot_BI[2, :], O_BI[1, :]),
-                       jnp.dot(Odot_BI[0, :], O_BI[2, :]),
-                       jnp.dot(Odot_BI[1, :], O_BI[0, :])))
+    W = jnp.einsum('kin,kjn->ijn', O_BI, Odot_BI)
+    return jnp.stack((W[2, 1], W[0, 2], W[1, 0]))
 
 
-_compute_angular_velocity = jax.vmap(_single_angular_velocity, in_axes=(0, 0))
-""" Vectorized form of the calculation of O_RI. """
-
-
-class AngularVelocityComp(om.JaxExplicitComponent):
+class AngularVelocityComp(JaxExplicitComp):
     """
     Compute the angular velocity of the spacraft body frame relative to the inertial frame.
     """
-    def initialize(self):
-        self.options.declare('num_nodes', types=int)
+    num_nodes: int = Field(default=1)
 
-    def setup(self):
-        nn = self.options['num_nodes']
+    inputs: dict[str, InputVar] = {
+        'O_BI': InputVar(shape=(3, 3, 'num_nodes'), units='unitless',
+                         desc='Rotation matrix from body-fixed frame to Earth-centered '
+                              'inertial frame over time'),
+        'Odot_BI': InputVar(shape=(3, 3, 'num_nodes'), units='1/s',
+                            desc='Time derivative of O_BI.'),
+    }
 
-        # Inputs
-        self.add_input('O_BI', shape=(nn, 3, 3), units='unitless',
-                       desc='Rotation matrix from body-fixed frame to Earth-centered '
-                            'inertial frame over time')
+    outputs: dict[str, OutputVar] = {
+        'w_B': OutputVar(shape=(3, 'num_nodes'), units='rad/s',
+                         desc='Angular velocity of the body frame wrt the inertial frame.'),
+    }
 
-        self.add_input('Odot_BI', shape=(nn, 3, 3), units='1/s',
-                       desc='Time derivative of O_BI.')
-
-        # Outputs
-        self.add_output('w_B', shape=(nn, 3), units='rad/s',
-                        desc='Angular velocity of the body frame wrt the inertial frame.')
-
-    def compute_primal(self, O_BI, Odot_BI):
-        return _compute_angular_velocity(O_BI, Odot_BI)
+    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
+                        statics=None):
+        outputs['w_B'] = _compute_angular_velocity(inputs['O_BI'], inputs['Odot_BI'])
