@@ -32,6 +32,16 @@
 
 - [ ] `Solar_ExposedArea`: **blocked** by `OM4_NEEDS.md` #3 (no structured-grid interpolation).
 
+## Battery (`CADRE/battery_dymos.py`, from `CADRE/battery.py`)
+
+- [x] `BatterySOCComp` (`BatterySOC`): the rate of an `SOC` state, in place of the legacy RK4.
+- [x] `BatteryPowerComp` (`BatteryPower`)
+- [x] `battery_path_constraints()` replaces `BatteryConstraints`: the KS aggregates over the time history become path constraints on `I_bat` and `SOC` (ADL-006).
+
+## Thermal (`CADRE/thermal_dymos.py`, from `CADRE/thermal_temperature.py`)
+
+- [x] `ThermalTemperatureComp` (`ThermalTemperature`): the rate of a 5-vector `temperature` state, in place of the legacy RK4. Checked against the legacy rate, verbatim; the legacy analytic state Jacobian was wrong (ADL-004). Picard propagation tested against the closed-form radiative cooling.
+
 ## Orbit (`CADRE/orbital_equations/`)
 
 - [x] `TwoBodyDynamicsComp` (analytic partials; one partial bug fixed, ADL-004)
@@ -61,12 +71,13 @@ are blocked and marked `expectedFailure`:
 |---|---|---|
 | `orbital_equations/EOMs/test/test_orbit_prop.py::test_propagation` | `OM4_NEEDS.md` #1 / `DYMOS4_NEEDS.md` #1 (unitless rate units) | Yes: with explicit rate units, Picard propagates the orbit and closes it after one period |
 | `orbital_equations/EOMs/test/test_orbit_prop.py::test_j2_propagation` | same | Yes |
+| `test/test_battery_dymos.py::test_discharge` | same (the unitless `SOC` state) | Yes: matches scipy `solve_ivp` to 1e-8 |
 | `orbital_equations/EOMs/test/test_orbit_and_attitude.py::test_propagation` | same (orbit states and the quaternion control) | Yes: IPOPT converges in 4 iterations, pointing error 1e-13, `w_B` is the orbit normal in the body frame at the orbital rate, `T_req` ~ 0 |
 
 ## Not started
 
-The rest of the legacy OpenMDAO 2.x model (`CADRE/*.py` at the top level: battery, comm, power,
-thermal, kinematics, orbit, rk4, the CADRE group and MDP) and its tests in `CADRE/test/`. Its
+The rest of the legacy OpenMDAO 2.x model (`CADRE/*.py` at the top level: comm, power,
+kinematics, orbit, parameters, rk4, the CADRE group and MDP) and its tests in `CADRE/test/`. Its
 RK4 integration is to be replaced by dymos4 phases. **When porting it, apply `O_BI^T`**: the
 legacy code uses `O_BI` as inertial to body (`r_b2g_B = O_BI r_b2g_I` in comm, `r_e2s_B` in sun),
 while the ported components use body to inertial (ADL-005).

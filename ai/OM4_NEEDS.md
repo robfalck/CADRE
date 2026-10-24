@@ -22,7 +22,8 @@ refused:
 
 - **Hit by:** every phase with a unitless state or control. In CADRE: the modified equinoctial
   elements `f`, `g`, `h`, `k` (`test_orbit_prop.py`, `test_orbit_and_attitude.py`) and the
-  attitude quaternion control `q` (`test_orbit_and_attitude.py`).
+  attitude quaternion control `q` (`test_orbit_and_attitude.py`), and the battery state of charge
+  `SOC` (`test_battery_dymos.py`).
 - **Interacts with:** `DYMOS4_NEEDS.md` #1 (dymos4 builds rate units by string concatenation).
   Fixing either one unblocks CADRE; fixing this one is the more general fix.
 - **Meanwhile:** the affected tests are `expectedFailure`. Verified in a scratch script that

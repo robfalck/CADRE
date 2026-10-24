@@ -11,7 +11,8 @@ gets `unitless/TU_earth`, which om4 refuses to connect to an ODE output in `1/TU
 (see `OM4_NEEDS.md` #1). The same happens for a unitless control's `_rate` and `_rate2`.
 
 - **Hit by:** `test_orbit_prop.py` (states `f`, `g`, `h`, `k`), `test_orbit_and_attitude.py`
-  (those states, and the quaternion control `q`, whose rates feed `q_rate` in `1/s`).
+  (those states, and the quaternion control `q`, whose rates feed `q_rate` in `1/s`),
+  `test_battery_dymos.py` (the state of charge `SOC`).
 - **Meanwhile:** the affected tests are `expectedFailure`. Explicit `State.rate_units` would
   avoid it for states, but that is a workaround that every unitless state would need.
 - **Fix:** derive rate units with om4's unit algebra (or special-case unitless/None), so a
