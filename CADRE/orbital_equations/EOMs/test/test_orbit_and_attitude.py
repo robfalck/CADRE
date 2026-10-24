@@ -177,10 +177,6 @@ class TestOrbitAttitudeODE(unittest.TestCase):
 
 class TestOrbitAndAttitude(unittest.TestCase):
 
-    # Blocked: the rate units of the unitless orbital elements and of the unitless quaternion
-    # control are composed as 'unitless/TU_earth', which om4 will not connect to '1/TU_earth'
-    # or '1/s'. See ai/OM4_NEEDS.md #1 and ai/DYMOS4_NEEDS.md #1.
-    @unittest.expectedFailure
     def test_propagation(self):
         prob = build_problem()
         result = prob.run_optimizer()

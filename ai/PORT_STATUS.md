@@ -90,15 +90,8 @@ Blocked components:
 | `Power_CellVoltage` | same |
 | `Comm_GainPattern` | same |
 
-Every other component above is ported and passes its own tests. These dymos4 integration tests
-are blocked and marked `expectedFailure`:
-
-| Test | Blocked by | Verified past the blocker? |
-|---|---|---|
-| `orbital_equations/EOMs/test/test_orbit_prop.py::test_propagation` | `OM4_NEEDS.md` #1 / `DYMOS4_NEEDS.md` #1 (unitless rate units) | Yes: with explicit rate units, Picard propagates the orbit and closes it after one period |
-| `orbital_equations/EOMs/test/test_orbit_prop.py::test_j2_propagation` | same | Yes |
-| `test/test_battery_dymos.py::test_discharge` | same (the unitless `SOC` state) | Yes: matches scipy `solve_ivp` to 1e-8 |
-| `orbital_equations/EOMs/test/test_orbit_and_attitude.py::test_propagation` | same (orbit states and the quaternion control) | Yes: IPOPT converges in 4 iterations, pointing error 1e-13, `w_B` is the orbit normal in the body frame at the orbital rate, `T_req` ~ 0 |
+Every other component above is ported and passes its own tests. The dymos4 integration tests
+that were `expectedFailure` on `OM4_NEEDS.md` #1 now pass, with om4 at 3dc1ebd1 or later.
 
 ## Not started
 

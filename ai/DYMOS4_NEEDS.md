@@ -6,6 +6,10 @@ CADRE does in the meantime, and what the fix looks like.
 
 ## 1. Rate units are composed by string concatenation
 
+No longer blocking: with `OM4_NEEDS.md` #1 fixed, `unitless/TU_earth` connects to `1/TU_earth`,
+and the tests it hit pass. Kept because rate units built by concatenation are still fragile
+(e.g. for compound or offset units).
+
 A state's or control's rate units default to `f"{units}/{time_units}"`, so a `unitless` state
 gets `unitless/TU_earth`, which om4 refuses to connect to an ODE output in `1/TU_earth`
 (see `OM4_NEEDS.md` #1). The same happens for a unitless control's `_rate` and `_rate2`.
@@ -13,8 +17,6 @@ gets `unitless/TU_earth`, which om4 refuses to connect to an ODE output in `1/TU
 - **Hit by:** `test_orbit_prop.py` (states `f`, `g`, `h`, `k`), `test_orbit_and_attitude.py`
   (those states, and the quaternion control `q`, whose rates feed `q_rate` in `1/s`),
   `test_battery_dymos.py` (the state of charge `SOC`).
-- **Meanwhile:** the affected tests are `expectedFailure`. Explicit `State.rate_units` would
-  avoid it for states, but that is a workaround that every unitless state would need.
 - **Fix:** derive rate units with om4's unit algebra (or special-case unitless/None), so a
   unitless quantity's rate is `1/<time units>`. `OM4_NEEDS.md` #1 fixes this more generally.
 

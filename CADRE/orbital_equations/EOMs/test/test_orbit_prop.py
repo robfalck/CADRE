@@ -66,10 +66,6 @@ def _set_circular_orbit(phase):
 
 class TestOrbitProp(unittest.TestCase):
 
-    # Blocked: the rate units of the unitless elements (f, g, h, k) are composed as
-    # 'unitless/TU_earth', which om4 will not connect to the ODE's '1/TU_earth'.
-    # See ai/OM4_NEEDS.md #1 and ai/DYMOS4_NEEDS.md #1.
-    @unittest.expectedFailure
     def test_propagation(self):
         phase = _orbit_phase(TwoBodyODE())
         prob = Problem(model=phase)
@@ -94,8 +90,6 @@ class TestOrbitProp(unittest.TestCase):
         for c in (x, y, z, vx, vy, vz):
             assert_allclose(c[-1], c[0], atol=1e-6)
 
-    # Blocked: see test_propagation.
-    @unittest.expectedFailure
     def test_j2_propagation(self):
         """
         J2 on an equatorial orbit is purely radial.

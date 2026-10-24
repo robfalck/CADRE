@@ -62,9 +62,6 @@ class TestBatteryComps(unittest.TestCase):
 
 class TestBatteryDymos(unittest.TestCase):
 
-    # Blocked: SOC is unitless, so its rate units are composed as 'unitless/s', which om4 will
-    # not connect to the ODE's '1/s'. See ai/OM4_NEEDS.md #1 and ai/DYMOS4_NEEDS.md #1.
-    @unittest.expectedFailure
     def test_discharge(self):
         """A constant draw at the reference temperature, against scipy's integrator."""
         P = -20.0

@@ -5,9 +5,18 @@ being worked around in CADRE. Each entry says what hits it, what CADRE does in t
 (usually: the affected test is marked `expectedFailure`, so it flips to an unexpected success
 once fixed), and what the fix looks like.
 
-Versions in use: om4 branch `arch_udpate` (7946a83a), dymos4 branch `transition` (d467322).
+Versions in use: om4 branch `arch_udpate` at 3dc1ebd1 or later (needed for #1), dymos4 branch
+`transition` (d467322).
 
-## 1. `'unitless/X'` is not compatible with `'1/X'`
+## 1. ~~`'unitless/X'` is not compatible with `'1/X'`~~ — FIXED
+
+**Fixed** on om4 `arch_udpate` in 3dc1ebd1 (2026-10-23, committed, not yet pushed): the cause was
+`unit_library.ini` defining `unitless` as its own base dimension, so `unitless/s` had powers
+`1/s` does not. It is now `unitless: m/m` under `[units]` (so `percent` and `drag_count`, built
+from it, are dimensionless too), with regression tests in `om4/utils/tests/test_units.py`. OM3
+has the same bug. With the fix, all four CADRE tests that were `expectedFailure` on it pass and
+their marks are removed. CADRE needs om4 at 3dc1ebd1 or later. Side effects: `unitless/s` is
+now equivalent to `Hz`; `rad` stays its own dimension, so `rad/s` and `Hz` remain incompatible.
 
     >>> from om4.utils.units import is_compatible
     >>> is_compatible('1/s', 'unitless/s')
@@ -26,9 +35,6 @@ refused:
   `SOC` (`test_battery_dymos.py`).
 - **Interacts with:** `DYMOS4_NEEDS.md` #1 (dymos4 builds rate units by string concatenation).
   Fixing either one unblocks CADRE; fixing this one is the more general fix.
-- **Meanwhile:** the affected tests are `expectedFailure`. Verified in a scratch script that
-  with explicit `State(rate_units='1/TU_earth')` the orbit propagates correctly under Picard,
-  so this is the only blocker for those tests' orbit part.
 - **Fix:** treat `unitless` as the dimensionless unit 1 when parsing compound units.
 
 ## 2. om4 declares no dependencies, and jax 0.12 breaks asdex
