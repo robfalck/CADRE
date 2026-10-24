@@ -62,5 +62,5 @@ env = { JAX_PLATFORMS = "cpu" }
 [tasks]
 # Only the om4/dymos4 ports are tested here; the legacy OpenMDAO 2.x model
 # (CADRE/*.py at the top level and CADRE/test) still needs classic OpenMDAO.
-test = "testflo CADRE/attitude_dymos CADRE/orbital_equations CADRE/test/test_reactionwheel_dymos.py -f"
-lint = "ruff check CADRE/attitude_dymos CADRE/orbital_equations CADRE/reactionwheel_dymos.py CADRE/testing_utils.py CADRE/test/test_reactionwheel_dymos.py"
+test = "testflo CADRE/attitude_dymos CADRE/orbital_equations CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py -f"
+lint = "ruff check CADRE/attitude_dymos CADRE/orbital_equations CADRE/reactionwheel_dymos.py CADRE/sun_dymos.py CADRE/testing_utils.py CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py"

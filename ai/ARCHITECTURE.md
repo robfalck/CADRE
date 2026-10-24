@@ -21,6 +21,7 @@ CADRE.
 | `CADRE/attitude_dymos/` | Attitude kinematics and the pointing constraint (om4, JAX) |
 | `CADRE/orbital_equations/` | Orbit EOMs in modified equinoctial elements, frame conversions, perturbations (om4) |
 | `CADRE/reactionwheel_dymos.py` | Reaction wheel power and dynamics (om4, JAX) |
+| `CADRE/sun_dymos.py` | Sun direction, line of sight and body-frame angles (om4, JAX) |
 | `CADRE/testing_utils.py` | `wrap` and `assert_partials_ok` for component tests |
 | `CADRE/*.py`, `CADRE/test/` (other than the above) | The legacy OpenMDAO 2.x model with its own RK4 integrator. Not ported yet, not run by `pixi run test` |
 | `ai/PORT_STATUS.md` | Per-component port status and the list of blocked items |

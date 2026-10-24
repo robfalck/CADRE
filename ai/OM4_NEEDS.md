@@ -45,3 +45,21 @@ bound them. A fresh solve picks jax/jaxlib 0.12.0.1, and asdex 0.5.2 (the latest
 - **Fix:** declare om4's runtime dependencies (numpy, scipy, networkx, pydantic, rich,
   structlog, jax, asdex, ...) with bounds in om4's `pyproject.toml`, and upper-bound jax until
   asdex supports 0.12.
+
+## 3. No structured-grid (N-D table) interpolation component
+
+CADRE's solar model interpolates a table of exposed area on a 3-D grid (fin angle 10 x azimuth
+73 x elevation 37) for 84 outputs (7 cells on each of 12 panels), with derivatives with respect
+to all three inputs. The legacy model used MBI (a separate least-squares B-spline package that
+is not in the environment); OpenMDAO 3 would use `MetaModelStructuredComp`. om4 has no
+equivalent on `main` or `arch_udpate`. The upstream `feat/metamodel_1..4` stack adds
+interpolation methods (`interp_methods.py`), a 1-D `SplineComp` and an unstructured
+`MetaModelComp`, but no N-D structured-grid component. (A local `metamodels` branch's
+`MetaModelStructuredComp` design, in `METAMODEL_PLAN.md`, is the shape of what is needed.)
+
+- **Hit by:** `Solar_ExposedArea` (`CADRE/solar.py`); comm's antenna gain (`comm.py`, a 2-D
+  table) and the power model's solar-cell curve (`power.py`, a 3-D table) will need it too.
+- **Meanwhile:** the solar exposed-area component is not ported (blocked).
+- **Fix:** a `MetaModelStructuredComp` that takes several outputs on one grid (or one output with
+  extra trailing dimensions), smooth (cubic or B-spline) methods, vectorized over `num_nodes`,
+  and with node-diagonal partials.

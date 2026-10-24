@@ -21,6 +21,17 @@
 - [x] `ReactionWheel` (`CADRE/reactionwheel_dymos.py`), plus a Picard propagation test against the
   closed-form spin-up.
 
+## Sun (`CADRE/sun_dymos.py`, from `CADRE/sun.py`)
+
+- [x] `SunPositionECIComp` (`Sun_PositionECI`); its output is a unit vector, which the original declared in km.
+- [x] `SunLOSComp` (`Sun_LOS`); takes the 3-vector `r_e2b_I` rather than the original's 6-vector, and guards the square root so the derivative stays finite on the Earth-Sun line.
+- [x] `SunPositionBodyComp` (`Sun_PositionBody`); now `O_BI^T r_e2s_I` (ADL-005).
+- [x] `SunPositionSphericalComp` (`Sun_PositionSpherical`)
+
+## Solar (`CADRE/solar.py`)
+
+- [ ] `Solar_ExposedArea`: **blocked** by `OM4_NEEDS.md` #3 (no structured-grid interpolation).
+
 ## Orbit (`CADRE/orbital_equations/`)
 
 - [x] `TwoBodyDynamicsComp` (analytic partials; one partial bug fixed, ADL-004)
@@ -37,8 +48,14 @@
 
 ## Blocked
 
-Every component above is ported and passes its own tests. What is blocked is the dymos4
-integration tests, which are marked `expectedFailure`:
+Blocked components:
+
+| Component | Blocked by |
+|---|---|
+| `Solar_ExposedArea` | `OM4_NEEDS.md` #3 (no structured-grid interpolation component) |
+
+Every other component above is ported and passes its own tests. These dymos4 integration tests
+are blocked and marked `expectedFailure`:
 
 | Test | Blocked by | Verified past the blocker? |
 |---|---|---|
@@ -48,7 +65,7 @@ integration tests, which are marked `expectedFailure`:
 
 ## Not started
 
-The legacy OpenMDAO 2.x model (`CADRE/*.py` at the top level: battery, comm, power, solar, sun,
+The rest of the legacy OpenMDAO 2.x model (`CADRE/*.py` at the top level: battery, comm, power,
 thermal, kinematics, orbit, rk4, the CADRE group and MDP) and its tests in `CADRE/test/`. Its
 RK4 integration is to be replaced by dymos4 phases. **When porting it, apply `O_BI^T`**: the
 legacy code uses `O_BI` as inertial to body (`r_b2g_B = O_BI r_b2g_I` in comm, `r_e2s_B` in sun),
