@@ -42,6 +42,29 @@
 
 - [x] `ThermalTemperatureComp` (`ThermalTemperature`): the rate of a 5-vector `temperature` state, in place of the legacy RK4. Checked against the legacy rate, verbatim; the legacy analytic state Jacobian was wrong (ADL-004). Picard propagation tested against the closed-form radiative cooling.
 
+## Power (`CADRE/power_dymos.py`, from `CADRE/power.py`)
+
+- [ ] `Power_CellVoltage`: **blocked** by `OM4_NEEDS.md` #3 (it interpolates the solar cell voltage table).
+- [x] `SolarPowerComp` (`Power_SolarPower`)
+- [x] `PowerTotalComp` (`Power_Total`)
+
+## Comm (`CADRE/comm_dymos.py`, from `CADRE/comm.py`)
+
+The legacy comm matrices are transposed so their names keep the from/to meaning (ADL-005): `O_IE` is inertial to Earth-fixed and `O_AB` is antenna to body.
+
+- [x] `CommGSPosEarthComp` (`Comm_GSposEarth`); the original declared lat/lon in rad but converted them from degrees.
+- [x] `CommEarthsSpinComp`, `CommEarthsSpinMtxComp` (`Comm_EarthsSpin`, `Comm_EarthsSpinMtx`); tested to turn the station eastward a quarter turn per 6 h.
+- [x] `CommGSPosECIComp` (`Comm_GSposECI`)
+- [x] `CommVectorECIComp` (`Comm_VectorECI`); takes the 3-vector `r_e2b_I`.
+- [x] `CommVectorBodyComp` (`Comm_VectorBody`); now `O_BI^T r_b2g_I`.
+- [x] `CommAntRotationComp`, `CommAntRotationMtxComp` (`Comm_AntRotation`, `Comm_AntRotationMtx`)
+- [x] `CommVectorAntComp` (`Comm_VectorAnt`)
+- [x] `CommVectorSphericalComp` (`Comm_VectorSpherical`)
+- [x] `CommDistanceComp` (`Comm_Distance`)
+- [x] `CommLOSComp` (`Comm_LOS`)
+- [x] `CommBitRateComp` (`Comm_BitRate`); its `Dr` is the rate of a `Data` state, which replaces `Comm_DataDownloaded` (ADL-006). Picard propagation of `Data` tested.
+- [ ] `Comm_GainPattern`: **blocked** by `OM4_NEEDS.md` #3 (it interpolates the antenna gain table).
+
 ## Orbit (`CADRE/orbital_equations/`)
 
 - [x] `TwoBodyDynamicsComp` (analytic partials; one partial bug fixed, ADL-004)
@@ -55,6 +78,7 @@
 - [x] `TotalPerturbation`
 - [x] `Perturbations` (group)
 - [x] `TwoBodyEOM` (group; the unused `sc_params` option is dropped)
+- [x] `OrbitInitialComp` (`orbit_initial_comp.py`, from `Orbit_Initial` in `CADRE/orbit.py`): outputs the initial MEE rather than r, v; checked against the legacy r, v. The legacy `Orbit_Dynamics` RK4 is replaced by `TwoBodyEOM` in a phase.
 
 ## Blocked
 
@@ -63,6 +87,8 @@ Blocked components:
 | Component | Blocked by |
 |---|---|
 | `Solar_ExposedArea` | `OM4_NEEDS.md` #3 (no structured-grid interpolation component) |
+| `Power_CellVoltage` | same |
+| `Comm_GainPattern` | same |
 
 Every other component above is ported and passes its own tests. These dymos4 integration tests
 are blocked and marked `expectedFailure`:
@@ -76,8 +102,9 @@ are blocked and marked `expectedFailure`:
 
 ## Not started
 
-The rest of the legacy OpenMDAO 2.x model (`CADRE/*.py` at the top level: comm, power,
-kinematics, orbit, parameters, rk4, the CADRE group and MDP) and its tests in `CADRE/test/`. Its
+The rest of the legacy OpenMDAO 2.x model (`CADRE/*.py` at the top level: `parameters.py`'s
+`BsplineParameters`, which likely becomes dymos controls rather than a port, and the CADRE group
+and MDP) and its tests in `CADRE/test/`. Its
 RK4 integration is to be replaced by dymos4 phases. **When porting it, apply `O_BI^T`**: the
 legacy code uses `O_BI` as inertial to body (`r_b2g_B = O_BI r_b2g_I` in comm, `r_e2s_B` in sun),
 while the ported components use body to inertial (ADL-005).

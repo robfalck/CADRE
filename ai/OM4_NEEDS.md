@@ -58,9 +58,13 @@ interpolation methods (`interp_methods.py`), a 1-D `SplineComp` and an unstructu
 `MetaModelComp`, but no N-D structured-grid component. (A local `metamodels` branch's
 `MetaModelStructuredComp` design, in `METAMODEL_PLAN.md`, is the shape of what is needed.)
 
-- **Hit by:** `Solar_ExposedArea` (`CADRE/solar.py`); comm's antenna gain (`comm.py`, a 2-D
-  table) and the power model's solar-cell curve (`power.py`, a 3-D table) will need it too.
-- **Meanwhile:** the solar exposed-area component is not ported (blocked).
+- **Hit by:** `Solar_ExposedArea` (`CADRE/solar.py`, a 3-D table with 84 outputs),
+  `Comm_GainPattern` (`CADRE/comm.py`, a 2-D table of antenna gain in azimuth and elevation) and
+  `Power_CellVoltage` (`CADRE/power.py`, a 3-D table of cell voltage in temperature, exposed area
+  and current).
+- **Meanwhile:** those three components are not ported (blocked). Their consumers
+  (`ThermalTemperatureComp`, `CommBitRateComp`, `SolarPowerComp`) are, and take the table
+  outputs as inputs.
 - **Fix:** a `MetaModelStructuredComp` that takes several outputs on one grid (or one output with
   extra trailing dimensions), smooth (cubic or B-spline) methods, vectorized over `num_nodes`,
   and with node-diagonal partials.

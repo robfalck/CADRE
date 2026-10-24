@@ -35,6 +35,27 @@ def _sun_direction_eci(T):
     return jnp.stack((jnp.cos(Lambda), jnp.sin(Lambda)*jnp.cos(eps), jnp.sin(Lambda)*jnp.sin(eps)))
 
 
+def azimuth_elevation(v):
+    """
+    Return the azimuth and elevation of vectors.
+
+    Parameters
+    ----------
+    v : array-like (3, n)
+        Vectors, component-major.
+
+    Returns
+    -------
+    azimuth : array-like (n,)
+        Angle in the x-y plane from +x, in [0, 2 pi).
+    elevation : array-like (n,)
+        Angle from +z, in [0, pi].
+    """
+    x, y, z = v
+    r = jnp.sqrt(x**2 + y**2 + z**2)
+    return jnp.mod(jnp.arctan2(y, x), 2 * np.pi), jnp.arccos(z / r)
+
+
 class SunPositionECIComp(JaxExplicitComp):
     """
     Compute the direction from Earth to Sun in Earth-centered inertial frame.
@@ -166,7 +187,4 @@ class SunPositionSphericalComp(JaxExplicitComp):
 
     def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
                         statics=None):
-        x, y, z = inputs['r_e2s_B']
-        r = jnp.sqrt(x**2 + y**2 + z**2)
-        outputs['azimuth'] = jnp.mod(jnp.arctan2(y, x), 2 * np.pi)
-        outputs['elevation'] = jnp.arccos(z / r)
+        outputs['azimuth'], outputs['elevation'] = azimuth_elevation(inputs['r_e2s_B'])

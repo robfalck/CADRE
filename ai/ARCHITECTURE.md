@@ -24,6 +24,8 @@ CADRE.
 | `CADRE/sun_dymos.py` | Sun direction, line of sight and body-frame angles (om4, JAX) |
 | `CADRE/battery_dymos.py` | Battery state-of-charge rate, current, and path constraints (om4, JAX) |
 | `CADRE/thermal_dymos.py` | Fin and body temperature rates (om4, JAX) |
+| `CADRE/power_dymos.py` | Solar and battery power (om4, JAX) |
+| `CADRE/comm_dymos.py` | Ground-station geometry, line of sight and bit rate (om4, JAX) |
 | `CADRE/testing_utils.py` | `wrap` and `assert_partials_ok` for component tests |
 | `CADRE/*.py`, `CADRE/test/` (other than the above) | The legacy OpenMDAO 2.x model with its own RK4 integrator. Not ported yet, not run by `pixi run test` |
 | `ai/PORT_STATUS.md` | Per-component port status and the list of blocked items |
