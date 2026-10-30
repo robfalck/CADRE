@@ -39,9 +39,10 @@ from om4.core.system import System
 from om4.transforms import AffineTransform
 from om4.utils.polymorphic import Polymorphic
 from om4.utils.promotion import normalize_promotes_list
-from dymos4.grid_data import RadauGrid
+from dymos4.grid_data import BirkhoffGrid, RadauGrid
 from dymos4.options import Control, ObjectiveSpec, Parameter, PathConstraint, State, Time
 from dymos4.phase.phase import Phase
+from dymos4.transcriptions.birkhoff import Birkhoff
 from dymos4.transcriptions.radau import Radau
 
 from CADRE.attitude_dymos.obr_comp import _compute_O_BR
@@ -62,6 +63,12 @@ MEE = ('p', 'f', 'g', 'h', 'k', 'L')
 #: Reference magnitudes of the states, which scale them and their defects for the optimizer.
 STATE_REF = {'p': 1.0, 'f': 1.0, 'g': 1.0, 'h': 1.0, 'k': 1.0, 'L': 10.0, 'w_RW': 1.0,
              'temperature': 100.0, 'SOC': 1.0, 'Data': 1000.0}
+
+#: Each state's rate output in ``CADREODE``, and its units per second.
+STATE_RATE = {'p': ('p_dot', 'DU_earth/s'), 'f': ('f_dot', '1/s'), 'g': ('g_dot', '1/s'),
+              'h': ('h_dot', '1/s'), 'k': ('k_dot', '1/s'), 'L': ('L_dot', 'rad/s'),
+              'w_RW': ('alpha_RW', 'rad/s**2'), 'temperature': ('temperature_dot', 'degK/s'),
+              'SOC': ('SOC_dot', '1/s'), 'Data': ('Dr', 'Gibyte/s')}
 
 #: The design parameters shared by every design point, with the legacy MDP's bounds.
 SHARED = {
@@ -128,7 +135,7 @@ def roll_quaternion(r, v, gamma):
 
 
 def cadre_phase(LD, mee0, num_segments=60, nodes_per_seg=4, table_method='lagrange3',
-                solve_segments=False, objective=False):
+                solve_segments=False, objective=False, transcription='radau', num_nodes=None):
     """
     One design point: a 12-hour phase of ``CADREODE`` from the initial MEE ``mee0``.
 
@@ -147,7 +154,18 @@ def cadre_phase(LD, mee0, num_segments=60, nodes_per_seg=4, table_method='lagran
         leaving them to the optimizer.
     objective : bool
         Maximize this point's data downloaded (for a single-point problem).
+    transcription : str
+        ``'radau'`` (on ``num_segments`` x ``nodes_per_seg``) or ``'birkhoff'`` (one segment of
+        ``num_nodes`` CGL nodes).
     """
+    if transcription == 'radau':
+        tx = Radau(grid_data=RadauGrid(num_segments=num_segments, nodes_per_seg=nodes_per_seg),
+                   solve_segments=solve_segments)
+    elif transcription == 'birkhoff':
+        tx = Birkhoff(grid_data=BirkhoffGrid(num_nodes=num_nodes), solve_segments=solve_segments)
+    else:
+        raise ValueError(f"transcription must be 'radau' or 'birkhoff', not {transcription!r}")
+
     def scaled(**kwargs):
         name = kwargs.pop('name')
         ref = AffineTransform(scale=1.0 / STATE_REF[name])
@@ -155,9 +173,7 @@ def cadre_phase(LD, mee0, num_segments=60, nodes_per_seg=4, table_method='lagran
 
     phase = Phase(
         ode=CADREODE(table_method=table_method),
-        transcription=Radau(grid_data=RadauGrid(num_segments=num_segments,
-                                                nodes_per_seg=nodes_per_seg),
-                            solve_segments=solve_segments),
+        transcription=tx,
         time=Time(units='s', opt_initial=False, opt_duration=False, duration_val=DURATION),
         states={
             **{name: scaled(name=name, opt_initial=False, val=float(mee0[name])) for name in MEE},
@@ -227,6 +243,34 @@ def simulate(LD, r0, v0, num_segments=60, nodes_per_seg=4, table_method='lagrang
     return prob
 
 
+def seed_states(phase, sim):
+    """
+    Set ``phase``'s states from the simulation ``sim`` (a problem from ``simulate``),
+    interpolated in time.
+    """
+    t = sim.get_val('t')
+    t_unique, first = np.unique(t, return_index=True)
+    for name in phase.states:
+        vals = sim.get_val(f'states_{name}').reshape(-1, t.size)[:, first]
+        phase.set_state_val(name, vals.T if vals.shape[0] > 1 else vals[0],
+                            time_vals=t_unique / DURATION)
+
+
+def seed_state_rates(prob, phase, prefix=''):
+    """
+    Set a Birkhoff phase's state rates from its own ODE at its current states.
+
+    Interpolating rates from another grid misses where they switch (eclipse, ground-station
+    passes); evaluating the ODE at this grid's nodes does not. Runs the model.
+    """
+    prob.run_model()
+    for name in phase.states:
+        source, units = STATE_RATE[name]
+        # The state rates are per unit tau of the one segment: dt/dtau = duration / 2.
+        phase.set_val(f'state_rates_{name}',
+                      prob.get_val(f'{prefix}ode.{source}', units=units) * 0.5 * DURATION)
+
+
 class MDPComp(JaxExplicitComp):
     """
     The MDP objective, the negative total data downloaded, and each point's state-of-charge
@@ -250,13 +294,14 @@ class MDPComp(JaxExplicitComp):
             outputs[f'SOC_periodic_{i}'] = inputs[f'SOC0_{i}'] - inputs[f'SOCf_{i}']
 
 
-def _mdp_kwargs(npts, num_segments, nodes_per_seg, table_method):
+def _mdp_kwargs(npts, num_segments, nodes_per_seg, table_method, transcription, num_nodes):
     points = launch_points()[:npts]
     subsystems, connections = {}, []
     for i, pt in enumerate(points):
         mee, _, _ = orbit_guess(pt['r0'], pt['v0'], np.zeros(1))
         phase = cadre_phase(pt['LD'], {k: v[0] for k, v in mee.items()}, num_segments,
-                            nodes_per_seg, table_method)
+                            nodes_per_seg, table_method, transcription=transcription,
+                            num_nodes=num_nodes)
         phase.promotes_inputs = normalize_promotes_list([(f'parameters:{name}', name) for name in SHARED])
         subsystems[f'pt{i}'] = phase
         connections += [Connection(src=f'pt{i}.final_states_Data', tgt=f'mdp.Data_{i}'),
@@ -277,12 +322,16 @@ class CADREMDP(Group):
     The CADRE MDP: ``npts`` design points (``pt0``, ``pt1``, ...) and the ``mdp`` objective.
 
     ``cellInstd``, ``finAngle`` and ``antAngle`` are promoted from every point to one shared
-    design variable each.
+    design variable each. ``transcription`` is ``'radau'`` (on ``num_segments`` x
+    ``nodes_per_seg``) or ``'birkhoff'`` (``num_nodes``); the seeding simulation always uses
+    the Radau grid.
     """
     npts: int = Field(default=6, ge=1, le=6)
     num_segments: int = Field(default=60)
     nodes_per_seg: int = Field(default=4)
     table_method: str = Field(default='lagrange3')
+    transcription: str = Field(default='radau')
+    num_nodes: int | None = Field(default=None, description='Birkhoff node count.')
 
     # Derived from the fields above; not part of the constructor API.
     subsystems: dict[str, Polymorphic[System]] = Field(default=PydanticUndefined, init=False)
@@ -295,18 +344,20 @@ class CADREMDP(Group):
             return data
         data = dict(data)
         kwargs = _mdp_kwargs(data.get('npts', 6), data.get('num_segments', 60),
-                             data.get('nodes_per_seg', 4), data.get('table_method', 'lagrange3'))
+                             data.get('nodes_per_seg', 4), data.get('table_method', 'lagrange3'),
+                             data.get('transcription', 'radau'), data.get('num_nodes'))
         for key in ('design_vars', 'constraints', 'objectives'):
             kwargs[key] = {**kwargs[key], **data.get(key, {})}
         data.update(kwargs)
         return data
 
-    def set_initial_guess(self, simulate_states=True, **design):
+    def set_initial_guess(self, simulate_states=True, prob=None, **design):
         """
         Seed every design point with its orbit and the legacy initial design.
 
         With ``simulate_states`` the states are those of a simulation of that design, so the
-        optimizer starts with every defect satisfied.
+        optimizer starts with every defect (nearly) satisfied. A Birkhoff grid also needs its
+        state rates, from its own ODE, for which ``prob`` (this group's problem) is required.
         """
         for i, pt in enumerate(launch_points()[:self.npts]):
             phase = self.subsystems[f'pt{i}']
@@ -314,6 +365,15 @@ class CADREMDP(Group):
             if simulate_states:
                 sim = simulate(pt['LD'], pt['r0'], pt['v0'], self.num_segments, self.nodes_per_seg,
                                self.table_method, **design)
-                for name in phase.states:
-                    for var in (f'states_{name}', f'initial_states_{name}', f'final_states_{name}'):
-                        phase.set_val(var, sim.get_val(var))
+                if self.transcription == 'radau':
+                    # The same grid: copy the states exactly.
+                    for name in phase.states:
+                        for var in (f'states_{name}', f'initial_states_{name}', f'final_states_{name}'):
+                            phase.set_val(var, sim.get_val(var))
+                else:
+                    seed_states(phase, sim)
+        if simulate_states and self.transcription == 'birkhoff':
+            if prob is None:
+                raise ValueError('Seeding Birkhoff state rates needs the problem: pass prob.')
+            for i in range(self.npts):
+                seed_state_rates(prob, self.subsystems[f'pt{i}'], prefix=f'pt{i}.')

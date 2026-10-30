@@ -114,3 +114,29 @@ variable.
 
 - **Hit by:** a CADRE test that set `h` and `k` on `RComp`, which has neither.
 - **Fix:** raise a `KeyError`/`ValueError` naming the variable, as `get_val` does.
+
+## Nice to have
+
+Not gaps that block CADRE, but things the port kept working around by hand.
+
+- **Table meta-model adapters.** `StructuredMetaModelComp` (PR #404) takes every input as
+  `(vec_size,)` and puts the node axis first on its outputs, so CADRE needs adapter components:
+  `FinAngleNodesComp` broadcasts the static fin angle to the nodes, `ExposedAreaTransposeComp`
+  moves the node axis last, and `CellVoltagePointsComp`/`CellVoltageSumComp` flatten the cell
+  points and sum them. An option for node-last outputs, and for inputs that are scalars rather than
+  per point, would remove most of them.
+- **Shape expressions.** `shape=('7*12*num_nodes',)` is not accepted; CADRE adds a `num_cells`
+  property and refers to that.
+- **Promotes assigned after construction.** Assigning `system.promotes_inputs = [...]` skips the
+  validator, so tuples must be passed through `normalize_promotes_list` by hand (dymos4 does the
+  same in `picard_iter_group`).
+- **Ambiguous input defaults, one at a time.** Inputs promoted together whose components disagree
+  on a default raise one error per name; `CADREODE` needed several rounds to find them all. Listing
+  every ambiguous name at once would help.
+- **Log noise.** Every CADRE run filters asdex `DenseColoringWarning`, the table extrapolation
+  warning (its text lists the points, so it changes on every evaluation and is never deduplicated)
+  and the "no coupling to resolve" INFO message.
+- **Why an optimization stalled.** Finding the constraints IPOPT and Uno could not satisfy needed a
+  hand-written report of the worst violation of each constraint and where it was. A built-in
+  post-optimization report of the worst constraints (and design variables at their bounds) would
+  have found it at once.

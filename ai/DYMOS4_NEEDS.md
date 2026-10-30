@@ -71,3 +71,50 @@ smoother than the per-segment Lagrange interpolant.
   points as the design variables, evaluated (with rates) at the nodes by a fixed sparse basis
   matrix, independent of the grid. om4's `SplineComp` with `BSplineCurve` (om4 PR #405, the
   counterpart of OpenMDAO 3's `bsplines`) is the interpolation it would need.
+
+## 5. ~~`lagrange_matrices` is O(N**4) and overflows near 1000 nodes~~ — FIXED
+
+**Fixed** on dymos4 `main` in e58a2eb (2026-10-30, OpenMDAO/dymos4 PR #49, commit 2292bd6):
+`lagrange_matrices` now uses the barycentric formulas below, with tests in
+`dymos4/utils/tests/test_lagrange.py`. CADRE's Birkhoff phases need dymos4 e58a2eb or later.
+
+`dymos4.utils.lagrange.lagrange_matrices` (inherited from dymos 1.x) builds the
+differentiation matrix with a double loop over the nodes, each taking a product over an
+`n_interp x n_disc` array: O(N**4) work. Its barycentric weights are products of `1/(x_j - x_k)`,
+which grow like 2**N and overflow a double near 1000 nodes. On a Radau grid N is a segment's node
+count, so it never mattered; on a Birkhoff grid it is the whole phase.
+
+- **Hit by:** a CADRE design point under `Birkhoff`: `ControlComp` calls it through
+  `GridData.phase_lagrange_matrices`, and building the phase took 12 s at 241 nodes, 488 s at
+  721 and over 7 hours at 481 under a profiler, all of it here.
+- **Meanwhile (before the fix):** Birkhoff above a few hundred nodes was unusable; CADRE's
+  Birkhoff runs used a scratch dymos4 with the fix below.
+- **Fix:** the barycentric formulas, O(n_interp * n_disc): `L_ij = (w_j / (x_i - x_j)) / sum_k
+  (w_k / (x_i - x_k))`, `D_ij = L_ij * sum_{k != j} 1 / (x_i - x_k)` off the nodes, and
+  `D_mj = (w_j / w_m) / (x_m - x_j)`, `D_mm = -sum_{j != m} D_mj` on node m, with the weights
+  accumulated as logarithms and normalized (only their ratios matter). Checked in a scratch copy:
+  it matches the current function to 1e-10 on CGL, Gauss-plus-endpoint and off-node cases up to
+  25 nodes, and builds the 481-node matrices in 0.007 s (1201 nodes: 0.03 s, still finite).
+
+## Nice to have
+
+Not gaps that block CADRE, but things the port kept working around by hand.
+
+- **Simulate a phase's design.** CADRE builds a second phase with `solve_segments=True` to
+  simulate a design (`cadre_mdp_dymos.simulate`). A `phase.simulate()`, or a copy of a phase with
+  another transcription, would replace that.
+- **Seed a phase from another solution.** Starting an optimization from a simulation, or a
+  Birkhoff phase from a Radau one, is hand-written: interpolate each state in time
+  (`seed_states`), and for Birkhoff evaluate the ODE to set the state rates (`seed_state_rates`).
+  A helper that takes another phase's solution would cover it.
+- **Histories at unique times.** Segment boundaries repeat a time, so every comparison of a
+  history against another one needs `np.unique(t, return_index=True)`. Without a timeseries layer
+  (dymos4 ADL-002), a small helper returning the history at unique times would do.
+- **One reference for a state and its defect.** Every CADRE state passes the same
+  `AffineTransform` as `transform` and `defect_transform`. A `ref` on `State` setting both would be
+  simpler.
+- **A shared partials assertion.** CADRE and dymos4 each keep an `assert_partials_ok` helper
+  (smaller of absolute and relative error); one in om4 or dymos4 would serve both. And
+  `check_partials` takes one differentiator for every component, so a model with one component
+  that cannot take complex step (CADRE's `azimuth_elevation`) must check everything by finite
+  difference.
