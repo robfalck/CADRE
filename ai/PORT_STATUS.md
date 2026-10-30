@@ -30,7 +30,7 @@
 
 ## Solar (`CADRE/solar.py`)
 
-- [ ] `Solar_ExposedArea`: **blocked** by `OM4_NEEDS.md` #3 (no structured-grid interpolation).
+- [ ] `Solar_ExposedArea`: **blocked** by `OM4_NEEDS.md` #3 (no structured-grid interpolation; om4 PR #404 in review). Its table is ready: `exposed_area_table()` in `CADRE/tables.py` (ADL-007).
 
 ## Battery (`CADRE/battery_dymos.py`, from `CADRE/battery.py`)
 
@@ -44,7 +44,7 @@
 
 ## Power (`CADRE/power_dymos.py`, from `CADRE/power.py`)
 
-- [ ] `Power_CellVoltage`: **blocked** by `OM4_NEEDS.md` #3 (it interpolates the solar cell voltage table).
+- [ ] `Power_CellVoltage`: **blocked** by `OM4_NEEDS.md` #3 (it interpolates the solar cell voltage table). Its table is ready: `cell_voltage_table()` (ADL-007).
 - [x] `SolarPowerComp` (`Power_SolarPower`)
 - [x] `PowerTotalComp` (`Power_Total`)
 
@@ -63,7 +63,7 @@ The legacy comm matrices are transposed so their names keep the from/to meaning 
 - [x] `CommDistanceComp` (`Comm_Distance`)
 - [x] `CommLOSComp` (`Comm_LOS`)
 - [x] `CommBitRateComp` (`Comm_BitRate`); its `Dr` is the rate of a `Data` state, which replaces `Comm_DataDownloaded` (ADL-006). Picard propagation of `Data` tested.
-- [ ] `Comm_GainPattern`: **blocked** by `OM4_NEEDS.md` #3 (it interpolates the antenna gain table).
+- [ ] `Comm_GainPattern`: **blocked** by `OM4_NEEDS.md` #3 (it interpolates the antenna gain table). Its table is ready: `antenna_gain_table()` (ADL-007).
 
 ## Orbit (`CADRE/orbital_equations/`)
 
@@ -86,7 +86,7 @@ Blocked components:
 
 | Component | Blocked by |
 |---|---|
-| `Solar_ExposedArea` | `OM4_NEEDS.md` #3 (no structured-grid interpolation component) |
+| `Solar_ExposedArea` | `OM4_NEEDS.md` #3 (no structured-grid interpolation component; om4 PR #404 in review) |
 | `Power_CellVoltage` | same |
 | `Comm_GainPattern` | same |
 

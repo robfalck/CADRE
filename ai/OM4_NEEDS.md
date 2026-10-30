@@ -70,7 +70,20 @@ interpolation methods (`interp_methods.py`), a 1-D `SplineComp` and an unstructu
   and current).
 - **Meanwhile:** those three components are not ported (blocked). Their consumers
   (`ThermalTemperatureComp`, `CommBitRateComp`, `SolarPowerComp`) are, and take the table
-  outputs as inputs.
+  outputs as inputs. Their tables are ready: `CADRE/tables.py` provides each as the legacy MBI
+  fit sampled on a grid for cubic interpolation (ARCHITECTURE ADL-007).
+- **In review:** OpenMDAO/om4 PR #404 (dwmunster, `feat/metamodel_1`, open as of 2026-10-29)
+  adds `StructuredMetaModelComp`, which meets this need: N-D rectilinear grids, a trailing value
+  shape on each output, `vec_size` points with node-diagonal partials, and `cubic`, `lagrange3`,
+  `akima` and other methods. Checked against its branch head 80688338 with the `CADRE/tables.py`
+  tables: all three reproduce the legacy MBI outputs to within 2e-4 to 6e-4 of their range, and
+  the partials agree with finite difference and complex step. Notes for the port: `cubic` is
+  SciPy's B-spline and rejects complex step, which an ODE-level `differentiator='cs'` check
+  needs (CADRE's convention), so `lagrange3` (2e-4 to 6e-4) is the complex-step-safe choice;
+  `akima` and `pchip` are slow on the 84-output solar table (about 1 s per evaluation at 1500
+  nodes, against 5 ms for `cubic`); outputs are node-major, `(vec_size, *value_shape)`, against
+  CADRE's component-major convention; and every input must have shape `(vec_size,)`, so the
+  scalar fin angle must be broadcast.
 - **Fix:** a `MetaModelStructuredComp` that takes several outputs on one grid (or one output with
   extra trailing dimensions), smooth (cubic or B-spline) methods, vectorized over `num_nodes`,
   and with node-diagonal partials.
