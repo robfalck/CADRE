@@ -53,7 +53,7 @@ bound them. A fresh solve picks jax/jaxlib 0.12.0.1, and asdex 0.5.2 (the latest
   structlog, jax, asdex, ...) with bounds in om4's `pyproject.toml`, and upper-bound jax until
   asdex supports 0.12.
 
-## 3. No structured-grid (N-D table) interpolation component — met by om4 PR #404 (in review)
+## 3. No structured-grid (N-D table) interpolation component â€” met by om4 PR #404 (in review)
 
 CADRE's solar model interpolates a table of exposed area on a 3-D grid (fin angle 10 x azimuth
 73 x elevation 37) for 84 outputs (7 cells on each of 12 panels), with derivatives with respect
@@ -89,3 +89,28 @@ interpolation methods (`interp_methods.py`), a 1-D `SplineComp` and an unstructu
 - **Fix:** a `MetaModelStructuredComp` that takes several outputs on one grid (or one output with
   extra trailing dimensions), smooth (cubic or B-spline) methods, vectorized over `num_nodes`,
   and with node-diagonal partials.
+
+## 4. Block solvers swallow `AnalysisError` and can report false convergence
+
+`BlockNonlinearSolver.single_iteration` catches `AnalysisError` from a subsystem
+(`reraise_child_analysiserror` defaults to False), abandons the rest of the sweep, and sets the
+residual to the change in outputs over the sweep. When the error comes before anything has
+changed, that residual is exactly zero and the solver reports `converged`, with the outputs
+downstream of the failing component left at stale or default values.
+
+- **Hit by:** a CADRE design point under Picard (`DYMOS4_NEEDS.md` #3): a table component raised
+  `AnalysisError` for a temperature below its grid, and NonlinearBlockGS printed
+  `abs=0.00e+00 ... converged in 19 iterations` with inconsistent multiple-shooting anchors.
+- **Meanwhile:** nothing; CADRE no longer uses Picard. Diagnosed with
+  `reraise_child_analysiserror=True`.
+- **Fix:** treat an `AnalysisError` in a sweep as a failed iteration (never a zero residual):
+  re-raise by default, or mark the solve non-converged.
+
+## 5. `Problem.set_val` on a missing variable raises an opaque `TypeError`
+
+Setting a name that does not exist raises `TypeError: 'NoneType' object is not subscriptable`
+from `execnode.set_val` (`src_node[0]` on a failed lookup), rather than an error naming the
+variable.
+
+- **Hit by:** a CADRE test that set `h` and `k` on `RComp`, which has neither.
+- **Fix:** raise a `KeyError`/`ValueError` naming the variable, as `get_val` does.

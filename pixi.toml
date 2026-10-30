@@ -49,6 +49,9 @@ dymos4 = { path = "../dymos4.git", editable = true }
 nicegui = "*"
 # asdex 0.5.2 (latest) imports jax._src.core.ClosedJaxpr, which jax 0.12 removed.
 jax = ">=0.11,<0.12"
+# Python bindings to the Uno optimizer, for pyoptsparse's pyUno. pyoptsparse 2.16.1 sets
+# loose_* tolerance options that unopy removed in 0.4.15, so 0.4.14 is the newest that works.
+unopy = "==0.4.14"
 jaxlib = ">=0.11,<0.12"
 asdex = "*"
 pyxdsm = ">=2.3.2, <3"
@@ -63,5 +66,5 @@ env = { JAX_PLATFORMS = "cpu" }
 [tasks]
 # Only the om4/dymos4 ports are tested here; the legacy OpenMDAO 2.x model
 # (CADRE/*.py at the top level and CADRE/test) still needs classic OpenMDAO.
-test = "testflo CADRE/attitude_dymos CADRE/orbital_equations CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py CADRE/test/test_battery_dymos.py CADRE/test/test_thermal_dymos.py CADRE/test/test_power_dymos.py CADRE/test/test_comm_dymos.py CADRE/test/test_tables.py CADRE/test/test_solar_dymos.py -f"
-lint = "ruff check CADRE/attitude_dymos CADRE/orbital_equations CADRE/reactionwheel_dymos.py CADRE/sun_dymos.py CADRE/battery_dymos.py CADRE/thermal_dymos.py CADRE/power_dymos.py CADRE/comm_dymos.py CADRE/solar_dymos.py CADRE/tables.py CADRE/testing_utils.py CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py CADRE/test/test_battery_dymos.py CADRE/test/test_thermal_dymos.py CADRE/test/test_power_dymos.py CADRE/test/test_comm_dymos.py CADRE/test/test_tables.py CADRE/test/test_solar_dymos.py"
+test = "testflo CADRE/attitude_dymos CADRE/orbital_equations CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py CADRE/test/test_battery_dymos.py CADRE/test/test_thermal_dymos.py CADRE/test/test_power_dymos.py CADRE/test/test_comm_dymos.py CADRE/test/test_tables.py CADRE/test/test_solar_dymos.py CADRE/test/test_cadre_mdp_dymos.py -f"
+lint = "ruff check CADRE/attitude_dymos CADRE/orbital_equations CADRE/reactionwheel_dymos.py CADRE/sun_dymos.py CADRE/battery_dymos.py CADRE/thermal_dymos.py CADRE/power_dymos.py CADRE/comm_dymos.py CADRE/solar_dymos.py CADRE/cadre_ode.py CADRE/cadre_mdp_dymos.py CADRE/tables.py CADRE/testing_utils.py CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py CADRE/test/test_battery_dymos.py CADRE/test/test_thermal_dymos.py CADRE/test/test_power_dymos.py CADRE/test/test_comm_dymos.py CADRE/test/test_tables.py CADRE/test/test_solar_dymos.py CADRE/test/test_cadre_mdp_dymos.py"

@@ -31,3 +31,43 @@ convert them by hand.
   (the original set the torque control with `units='N*m'`).
 - **Meanwhile:** the tests pass values in the declared units.
 - **Fix:** accept `units=` and convert with `om4.utils.units.convert_units` before setting.
+
+## 3. Picard's first sweep integrates the ODE's default outputs, not the guess
+
+`picard_phase_parts` orders the Picard cycle `picard_update_comp`, `ms_update_comp`, `ode`, so
+the first NonlinearBlockGS sweep integrates every segment from the anchors' and the ODE rates'
+*default* values (1.0) before the ODE has been evaluated at the states the user seeded. The
+seeded guess is overwritten by `anchor + integral of 1`: a 720 s segment moves each state by
+720 in its units. CADRE's temperatures jump by 720 K, the T**4 radiation term blows up and the
+iteration diverges from an exact orbit guess. The orbit tests did not notice, because their
+default rates are mild in TU units. Separately, the Picard NonlinearBlockGS has `iprint=-1` and
+does not raise on non-convergence, so a diverged or unconverged solve returns garbage silently
+(see also `OM4_NEEDS.md` #4).
+
+- **Hit by:** a CADRE design point (`cadre_phase`) under `PicardShooting`.
+- **Meanwhile:** CADRE uses Radau instead (ARCHITECTURE ADL-008), which it needs anyway: the
+  reaction wheel speeds rotate at the body rate (`-w_B x w_RW`), so plain Picard diverges on
+  segments longer than about 170 s even from a consistent start.
+- **Fix:** order the cycle `ode`, `ms_update_comp`, `picard_update_comp`, so the first sweep
+  evaluates the ODE at the guess and the anchors from it. Checked in a scratch copy: the CADRE
+  phase then converges in 17 sweeps on a problem where it diverged. Also raise (or at least
+  warn) when the Picard solve does not converge.
+
+## 4. No B-spline control parameterization
+
+The legacy model shaped each control time history with an m-point B-spline
+(`BsplineParameters`: 300 control points over 1500 time points, for the roll, the comm power
+and the 12 panel currents). dymos4 controls have a value at every control input node, and
+`Control.order` (polynomial controls) is declared but not wired (dymos4 ADL-023), so there is
+no way to give a control fewer degrees of freedom than the grid has nodes, or to make it
+smoother than the per-segment Lagrange interpolant.
+
+- **Hit by:** the CADRE MDP (`CADRE/cadre_mdp_dymos.py`), whose `q`, `Isetpt` and `P_comm`
+  controls have 3 values per Radau segment: on a 300-segment grid, 900 per curve against the
+  legacy 300, and on coarser grids too few to follow the legacy design (60 segments give 1.3 times
+  the legacy data downloaded at the legacy design, from comm power the grid cannot resolve).
+- **Meanwhile:** plain dymos4 controls, with value and rate continuity.
+- **Fix:** a control option for a B-spline (or other basis) parameterization: `num_cp` control
+  points as the design variables, evaluated (with rates) at the nodes by a fixed sparse basis
+  matrix, independent of the grid. om4's `SplineComp` with `BSplineCurve` (om4 PR #405, the
+  counterpart of OpenMDAO 3's `bsplines`) is the interpolation it would need.

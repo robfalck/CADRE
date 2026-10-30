@@ -94,12 +94,13 @@ class CellVoltagePointsComp(JaxExplicitComp):
                            desc='Currents of the solar panels'),
     }
 
+    # Defaults inside the table: a solver may evaluate the table before this has run.
     outputs: dict[str, OutputVar] = {
-        'T_cell': OutputVar(shape=('num_cells',), units='degK',
+        'T_cell': OutputVar(shape=('num_cells',), val=273.0, units='degK',
                             desc='Temperature of each cell'),
-        'A_cell': OutputVar(shape=('num_cells',), units='m**2',
+        'A_cell': OutputVar(shape=('num_cells',), val=0.0, units='m**2',
                             desc='Illuminated area of each cell'),
-        'I_cell': OutputVar(shape=('num_cells',), units='A', desc='Current of each cell'),
+        'I_cell': OutputVar(shape=('num_cells',), val=0.0, units='A', desc='Current of each cell'),
     }
 
     def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
@@ -136,7 +137,7 @@ class CellVoltageSumComp(JaxExplicitComp):
         outputs['V_sol'] = jnp.sum(inputs['V_cell'].reshape(7, 12, self.num_nodes), axis=0)
 
 
-def _cell_voltage_subsystems(num_nodes, method):
+def _cell_voltage_subsystems(num_nodes, method, extrapolate):
     nn = num_nodes
     grid, V = cell_voltage_table()
     n_cells = 7 * 12 * nn
@@ -146,7 +147,7 @@ def _cell_voltage_subsystems(num_nodes, method):
                                         promotes_outputs=['T_cell', 'A_cell', 'I_cell']),
         'table': StructuredMetaModelComp(
             grid={'T_cell': grid['T'], 'A_cell': grid['A'], 'I_cell': grid['I']},
-            training_outputs={'V_cell': V}, method=method, vec_size=n_cells,
+            training_outputs={'V_cell': V}, method=method, vec_size=n_cells, extrapolate=extrapolate,
             inputs={'T_cell': InputVar(shape=(n_cells,), units='degK'),
                     'A_cell': InputVar(shape=(n_cells,), units='m**2'),
                     'I_cell': InputVar(shape=(n_cells,), units='A')},
@@ -167,9 +168,13 @@ class CellVoltageGroup(Group):
     ``method`` is the ``StructuredMetaModelComp`` method. The default, ``'lagrange3'``, is
     complex-step safe, as CADRE's ODE checks need; ``'cubic'`` is more accurate (4e-4) and
     smoother, but not complex-step safe.
+
+    With ``extrapolate=True`` a point outside the table is extrapolated (with a warning) rather
+    than raising ``AnalysisError``.
     """
     num_nodes: int = Field(default=1)
     method: str = Field(default='lagrange3', description='Interpolation method of the table.')
+    extrapolate: bool = Field(default=False, description='Extrapolate outside the table.')
 
     # Derived from the fields above; not part of the constructor API.
     subsystems: dict[str, Polymorphic[System]] = Field(default=PydanticUndefined, init=False)
@@ -181,5 +186,6 @@ class CellVoltageGroup(Group):
             return data
         data = dict(data)
         data['subsystems'] = _cell_voltage_subsystems(data.get('num_nodes', 1),
-                                                      data.get('method', 'lagrange3'))
+                                                      data.get('method', 'lagrange3'),
+                                                      data.get('extrapolate', False))
         return data

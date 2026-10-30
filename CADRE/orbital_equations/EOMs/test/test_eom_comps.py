@@ -5,7 +5,9 @@ from numpy.testing import assert_allclose
 
 from CADRE.orbital_equations.EOMs import TwoBodyDynamicsComp, TwoBodyEOM
 from CADRE.orbital_equations.EOMs.perturbations.perturbations import Perturbations
-from CADRE.orbital_equations.EOMs.perturbations.spherical_harmonics_comp import SphericalHarmonicsComp
+from CADRE.orbital_equations.EOMs.perturbations.spherical_harmonics_comp import J2, SphericalHarmonicsComp
+from CADRE.orbital_equations.frame_conversions import RComp
+from CADRE.orbital_equations.frame_conversions.mee_to_cart import mee_to_cart
 from CADRE.orbital_equations.EOMs.perturbations.total_perturbation import TotalPerturbation
 from CADRE.testing_utils import assert_partials_ok, wrap
 
@@ -50,6 +52,27 @@ class TestTwoBodyDynamicsComp(unittest.TestCase):
 
 
 class TestPerturbationComps(unittest.TestCase):
+
+    def test_spherical_harmonics_matches_cartesian_j2(self):
+        """The radial, transverse and normal components of the Cartesian J2 acceleration."""
+        p = _run(RComp(num_nodes=N), {k: MEE[k] for k in ('p', 'f', 'g', 'L')})
+        r = p.get_val('r')
+        p = _run(SphericalHarmonicsComp(num_nodes=N), {'h': MEE['h'], 'k': MEE['k'], 'L': MEE['L'], 'r': r})
+        a_rsw = np.vstack([p.get_val(f'J2_{c}') for c in 'rsw'])
+
+        # The legacy model's Cartesian J2 acceleration, with mu = Re = 1.
+        cart = np.asarray(mee_to_cart(*(MEE[k] for k in ('p', 'f', 'g', 'h', 'k', 'L'))))
+        pos, vel = cart[:3], cart[3:]
+        rr = np.sqrt(np.sum(pos**2, axis=0))
+        z2 = (pos[2] / rr)**2
+        a = -1.5 * J2 * pos / rr**5 * (1 - 5 * z2)
+        a[2] -= 3.0 * J2 * pos[2] / rr**5
+        r_hat = pos / rr
+        w_hat = np.cross(pos, vel, axis=0)
+        w_hat /= np.sqrt(np.sum(w_hat**2, axis=0))
+        s_hat = np.cross(w_hat, r_hat, axis=0)
+        expected = np.vstack([np.sum(a * e, axis=0) for e in (r_hat, s_hat, w_hat)])
+        assert_allclose(a_rsw, expected, rtol=1e-10, atol=1e-14)
 
     def test_spherical_harmonics_partials(self):
         p = _run(SphericalHarmonicsComp(num_nodes=N),

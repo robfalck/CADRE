@@ -86,14 +86,19 @@ Nothing is blocked. The three table components need om4 PR #404 (`OM4_NEEDS.md` 
 CADRE uses from the `../om4-pr404.git` worktree until it merges (ARCHITECTURE, Environment).
 Every component above is ported and passes its own tests.
 
+## Full model and MDP (`CADRE/cadre_ode.py`, `CADRE/cadre_mdp_dymos.py`)
+
+- [x] `CADREODE` (`CADRE` in `CADRE/CADRE_group.py`): every discipline above, pointwise. The legacy RK4 components (`Orbit_Dynamics`, `ReactionWheel_Dynamics`, `ThermalTemperature`, `BatterySOC`, `Comm_DataDownloaded`) are dymos4 states; `BsplineParameters` is replaced by dymos4 controls (`DYMOS4_NEEDS.md` #4); `BatteryConstraints` by path constraints.
+- [x] `cadre_phase`, `simulate` and `CADREMDP` (`CADRE_MDP_Group` in `CADRE/CADRE_mdp.py`): one Radau phase per launch point, shared `cellInstd`/`finAngle`/`antAngle`, the total-data objective and the SOC periodicity constraint (ADL-008). Checked against the legacy results: the initial design's `con5` to 2e-4 and its objective to 5% (`mdp_execute.pkl`), and design point 0 of the legacy optimized design (`data1346.pkl`) to 3% in data, 0.01 in SOC and 1.5 K in temperature; all six points of that design give 30,950 Gb against 30,892.
+- [ ] Optimizing the MDP to the legacy optimum: not reached. On one design point (60x4 Radau grid, 7003 variables), seeded from a simulation of the legacy initial design, IPOPT stalls in restoration at about 132 Gb and Uno (`ipopt` preset) stops on a line-search failure at about 203 Gb, against the legacy 5066 Gb; both are left with a defect of `L` (5e-3) and `q_norm_err` (2e-4) unsatisfied. Uno's `filtersqp` preset does not finish its first iteration at this size. Birkhoff is next.
+
+Differences from the legacy model: J2 only (the legacy orbit also had J3 and J4, under 3 km in 12 hours); controls at the nodes rather than 300-point B-splines; the roll subsumed by `q`.
+
+`sun_dymos.azimuth_elevation` (used by `SunPositionSphericalComp` and `CommVectorSphericalComp`) uses `jnp.arctan2` and `jnp.mod`, which reject complex inputs, so those two components, and the whole ODE, are not complex-step safe as the conventions ask.
+
 ## Not started
 
-The rest of the legacy OpenMDAO 2.x model (`CADRE/*.py` at the top level: `parameters.py`'s
-`BsplineParameters`, which likely becomes dymos controls rather than a port, and the CADRE group
-and MDP) and its tests in `CADRE/test/`. Its
-RK4 integration is to be replaced by dymos4 phases. **When porting it, apply `O_BI^T`**: the
-legacy code uses `O_BI` as inertial to body (`r_b2g_B = O_BI r_b2g_I` in comm, `r_e2s_B` in sun),
-while the ported components use body to inertial (ADL-005).
+The legacy model's own tests in `CADRE/test/` (`test_mdp.py`, `test_assembly.py`, ...) still need classic OpenMDAO and are not run.
 
 The CI workflow (`.github/workflows/CADRE_test_workflow.yml`) still installs dymos 1.x and
 OpenMDAO with conda; om4 and dymos4 are not published, so CI cannot run the ported tests yet.

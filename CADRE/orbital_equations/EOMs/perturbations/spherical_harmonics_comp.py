@@ -5,8 +5,9 @@ from om4.api import InputVar, JaxExplicitComp, OutputVar
 
 from CADRE.orbital_equations import CentralBody, set_body_units
 
-#: Earth's J2 coefficient as used by the original CADRE orbit model.
-J2 = 202.7e-6
+#: Earth's J2 coefficient, as the legacy CADRE orbit model used it. The canonical units make the
+#: Earth radius 1 DU (to 1e-7). The dymos 1.x version had 202.7e-6, the Moon's J2 (ADL-004).
+J2 = 1.08264e-3
 
 
 class SphericalHarmonicsComp(JaxExplicitComp):
