@@ -30,7 +30,7 @@
 
 ## Solar (`CADRE/solar_dymos.py`, from `CADRE/solar.py`)
 
-- [x] `ExposedAreaGroup` (`Solar_ExposedArea`): interpolates `exposed_area_table()` (ADL-007) with om4's `StructuredMetaModelComp`, from om4 PR #404 (`OM4_NEEDS.md` #3); values checked against the legacy outputs. Broadcasts the static `finAngle` to the nodes (`FinAngleNodesComp`) and moves the node axis last (`ExposedAreaTransposeComp`).
+- [x] `ExposedAreaGroup` (`Solar_ExposedArea`): interpolates `exposed_area_table()` (ADL-007) with om4's `StructuredMetaModelComp`, from om4 PR #404 (`OM4_NEEDS.md` #3); values checked against the legacy outputs. The static `finAngle` reaches the table's per-point input through `src_indices=[0] * num_nodes`, and `ExposedAreaTransposeComp` moves the node axis last (`OM4_NEEDS.md`, Nice to have).
 
 ## Battery (`CADRE/battery_dymos.py`, from `CADRE/battery.py`)
 

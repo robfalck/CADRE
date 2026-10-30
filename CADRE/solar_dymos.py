@@ -12,29 +12,9 @@ from pydantic_core import PydanticUndefined
 from om4.api import Group, InputVar, JaxExplicitComp, OutputVar, StructuredMetaModelComp
 from om4.core.system import System
 from om4.utils.polymorphic import Polymorphic
+from om4.utils.promotion import PromotesSpec
 
 from CADRE.tables import exposed_area_table
-
-
-class FinAngleNodesComp(JaxExplicitComp):
-    """
-    Broadcast the static fin angle to the nodes, as the exposed area table takes one per point.
-    """
-    num_nodes: int = Field(default=1)
-
-    inputs: dict[str, InputVar] = {
-        'finAngle': InputVar(shape=(1,), val=0.0, units='rad', desc='Fin angle of solar panel',
-                             tags={'dymos.static_target'}),
-    }
-
-    outputs: dict[str, OutputVar] = {
-        'fin_angle_nodes': OutputVar(shape=('num_nodes',), units='rad',
-                                     desc='Fin angle of solar panel at each node'),
-    }
-
-    def compute_outputs(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None,
-                        statics=None):
-        outputs['fin_angle_nodes'] = jnp.broadcast_to(inputs['finAngle'], (self.num_nodes,))
 
 
 class ExposedAreaTransposeComp(JaxExplicitComp):
@@ -62,19 +42,21 @@ def _exposed_area_subsystems(num_nodes, method):
     nn = num_nodes
     grid, area = exposed_area_table()
     return {
-        'fin_angle': FinAngleNodesComp(num_nodes=nn, promotes_inputs=['finAngle'],
-                                       promotes_outputs=['fin_angle_nodes']),
         'table': StructuredMetaModelComp(
-            grid={'fin_angle_nodes': grid['finAngle'], 'azimuth': grid['azimuth'],
+            grid={'finAngle': grid['finAngle'], 'azimuth': grid['azimuth'],
                   'elevation': grid['elevation']},
             training_outputs={'exposed_area_nodes': area}, method=method, vec_size=nn,
-            inputs={'fin_angle_nodes': InputVar(shape=(nn,), units='rad'),
+            # The table takes a fin angle per point; the one static fin angle is broadcast to
+            # them by the promotion below.
+            inputs={'finAngle': InputVar(shape=(nn,), units='rad', desc='Fin angle of solar panel',
+                                         tags={'dymos.static_target'}),
                     'azimuth': InputVar(shape=(nn,), units='rad',
                                         desc='Azimuth angle of the sun in the body-fixed frame'),
                     'elevation': InputVar(shape=(nn,), units='rad',
                                           desc='Elevation angle of the sun in the body-fixed frame')},
             outputs={'exposed_area_nodes': OutputVar(shape=(nn, 7, 12), units='m**2')},
-            promotes_inputs=['fin_angle_nodes', 'azimuth', 'elevation'],
+            promotes_inputs=[PromotesSpec(patterns=['finAngle'], src_indices=[0] * nn, src_shape=(1,)),
+                             'azimuth', 'elevation'],
             promotes_outputs=['exposed_area_nodes']),
         'transpose': ExposedAreaTransposeComp(num_nodes=nn, promotes_inputs=['exposed_area_nodes'],
                                               promotes_outputs=['exposedArea']),

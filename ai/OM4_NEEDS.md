@@ -119,12 +119,21 @@ variable.
 
 Not gaps that block CADRE, but things the port kept working around by hand.
 
-- **Table meta-model adapters.** `StructuredMetaModelComp` (PR #404) takes every input as
-  `(vec_size,)` and puts the node axis first on its outputs, so CADRE needs adapter components:
-  `FinAngleNodesComp` broadcasts the static fin angle to the nodes, `ExposedAreaTransposeComp`
-  moves the node axis last, and `CellVoltagePointsComp`/`CellVoltageSumComp` flatten the cell
-  points and sum them. An option for node-last outputs, and for inputs that are scalars rather than
-  per point, would remove most of them.
+- **Node-last outputs from the table meta-models.** `StructuredMetaModelComp` (PR #404) always
+  puts the vectorized (point) axis first on its outputs, `(vec_size, *value_shape)`. dymos4 and
+  CADRE are component-major (node axis last, dymos4 ADL-005), so CADRE adds
+  `ExposedAreaTransposeComp` to turn the `(num_nodes, 7, 12)` exposed area into the
+  `(7, 12, num_nodes)` its consumers take. Reordering the training data cannot help: its shape is
+  the grid axes followed by `value_shape`, and has no point axis. The point-first layout is assumed
+  in three places in `om4/components/table_meta_model.py`, which an option such as
+  `vec_axis='last'` would change together:
+  - `_build_table_io` declares each output as `(vec_size, *value_shape)`;
+  - `_write_outputs` writes `value[:, columns].reshape(shape)`, with one row of `value` per point;
+  - the partials pattern, `rows = arange(vec_size * output_size)` with
+    `cols = repeat(arange(vec_size), output_size)`, assumes the flattened output runs point by point.
+
+  (A scalar input needs nothing: a `(1,)` source promoted to a `(vec_size,)` input with
+  `src_indices=[0] * vec_size` broadcasts it, and dymos4 still sees a static target.)
 - **Shape expressions.** `shape=('7*12*num_nodes',)` is not accepted; CADRE adds a `num_cells`
   property and refers to that.
 - **Promotes assigned after construction.** Assigning `system.promotes_inputs = [...]` skips the

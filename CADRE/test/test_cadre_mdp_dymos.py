@@ -115,7 +115,7 @@ class TestCADREMDP(unittest.TestCase):
         assert_allclose(prob.get_val('mdp.SOC_periodic_1'), [0.5 - 0.4])
         # One shared fin angle reaches both design points.
         for i in range(2):
-            assert_allclose(prob.get_val(f'pt{i}.ode.fin_angle_nodes'), 0.3)
+            assert_allclose(prob.get_val(f'pt{i}.ode.exposed_area.table.finAngle'), 0.3)
 
 
 if __name__ == '__main__':

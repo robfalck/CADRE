@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from CADRE.solar_dymos import ExposedAreaGroup, ExposedAreaTransposeComp, FinAngleNodesComp
+from CADRE.solar_dymos import ExposedAreaGroup, ExposedAreaTransposeComp
 from CADRE.test.test_tables import CASE, LEGACY, assert_close_to_range
 from CADRE.testing_utils import assert_partials_ok, wrap
 
@@ -19,11 +19,6 @@ def _run(system, vals):
 
 
 class TestExposedAreaHelpers(unittest.TestCase):
-
-    def test_fin_angle_nodes(self):
-        p = _run(FinAngleNodesComp(num_nodes=3), {'finAngle': 0.7})
-        np.testing.assert_allclose(p.get_val('fin_angle_nodes'), [0.7, 0.7, 0.7])
-        assert_partials_ok(p.check_partials(differentiator='cs'))
 
     def test_transpose(self):
         area = np.random.default_rng(0).random((3, 7, 12))
