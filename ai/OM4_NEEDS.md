@@ -98,13 +98,21 @@ residual to the change in outputs over the sweep. When the error comes before an
 changed, that residual is exactly zero and the solver reports `converged`, with the outputs
 downstream of the failing component left at stale or default values.
 
+OpenMDAO 3 has the same option and default, but catches the error per subsystem: in
+`Solver._gs_iter` the `try` is inside the loop over subsystems, so only the failing subsystem is
+skipped and the rest of the sweep still runs. om4's `try` wraps the whole sweep
+(`self._run_subsystems(exec_node)`), so one error skips every subsystem after it. Under OpenMDAO 3
+a swallowed error leaves one subsystem stale and a false convergence needs everything else to have
+converged already; under om4 a single early error is enough.
+
 - **Hit by:** a CADRE design point under Picard (`DYMOS4_NEEDS.md` #3): a table component raised
   `AnalysisError` for a temperature below its grid, and NonlinearBlockGS printed
   `abs=0.00e+00 ... converged in 19 iterations` with inconsistent multiple-shooting anchors.
 - **Meanwhile:** nothing; CADRE no longer uses Picard. Diagnosed with
   `reraise_child_analysiserror=True`.
-- **Fix:** treat an `AnalysisError` in a sweep as a failed iteration (never a zero residual):
-  re-raise by default, or mark the solve non-converged.
+- **Fix:** catch the error per subsystem, as OpenMDAO 3 does, so the rest of the sweep still runs;
+  and treat a swallowed `AnalysisError` as a failed iteration, so it can never count as
+  convergence (or re-raise by default).
 
 ## 5. `Problem.set_val` on a missing variable raises an opaque `TypeError`
 
