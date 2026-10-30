@@ -28,9 +28,9 @@
 - [x] `SunPositionBodyComp` (`Sun_PositionBody`); now `O_BI^T r_e2s_I` (ADL-005).
 - [x] `SunPositionSphericalComp` (`Sun_PositionSpherical`)
 
-## Solar (`CADRE/solar.py`)
+## Solar (`CADRE/solar_dymos.py`, from `CADRE/solar.py`)
 
-- [ ] `Solar_ExposedArea`: **blocked** by `OM4_NEEDS.md` #3 (no structured-grid interpolation; om4 PR #404 in review). Its table is ready: `exposed_area_table()` in `CADRE/tables.py` (ADL-007).
+- [x] `ExposedAreaGroup` (`Solar_ExposedArea`): interpolates `exposed_area_table()` (ADL-007) with om4's `StructuredMetaModelComp`, from om4 PR #404 (`OM4_NEEDS.md` #3); values checked against the legacy outputs. Broadcasts the static `finAngle` to the nodes (`FinAngleNodesComp`) and moves the node axis last (`ExposedAreaTransposeComp`).
 
 ## Battery (`CADRE/battery_dymos.py`, from `CADRE/battery.py`)
 
@@ -44,7 +44,7 @@
 
 ## Power (`CADRE/power_dymos.py`, from `CADRE/power.py`)
 
-- [ ] `Power_CellVoltage`: **blocked** by `OM4_NEEDS.md` #3 (it interpolates the solar cell voltage table). Its table is ready: `cell_voltage_table()` (ADL-007).
+- [x] `CellVoltageGroup` (`Power_CellVoltage`): interpolates `cell_voltage_table()` (ADL-007) at one point per cell (`CellVoltagePointsComp`) and sums each panel's cells (`CellVoltageSumComp`). Values checked against the legacy outputs.
 - [x] `SolarPowerComp` (`Power_SolarPower`)
 - [x] `PowerTotalComp` (`Power_Total`)
 
@@ -63,7 +63,7 @@ The legacy comm matrices are transposed so their names keep the from/to meaning 
 - [x] `CommDistanceComp` (`Comm_Distance`)
 - [x] `CommLOSComp` (`Comm_LOS`)
 - [x] `CommBitRateComp` (`Comm_BitRate`); its `Dr` is the rate of a `Data` state, which replaces `Comm_DataDownloaded` (ADL-006). Picard propagation of `Data` tested.
-- [ ] `Comm_GainPattern`: **blocked** by `OM4_NEEDS.md` #3 (it interpolates the antenna gain table). Its table is ready: `antenna_gain_table()` (ADL-007).
+- [x] `GainPatternGroup` (`Comm_GainPattern`): interpolates `antenna_gain_table()` (ADL-007). The legacy `fixangles` wrap is dropped: `CommVectorSphericalComp` already gives angles inside the table. Values checked against the legacy outputs.
 
 ## Orbit (`CADRE/orbital_equations/`)
 
@@ -82,16 +82,9 @@ The legacy comm matrices are transposed so their names keep the from/to meaning 
 
 ## Blocked
 
-Blocked components:
-
-| Component | Blocked by |
-|---|---|
-| `Solar_ExposedArea` | `OM4_NEEDS.md` #3 (no structured-grid interpolation component; om4 PR #404 in review) |
-| `Power_CellVoltage` | same |
-| `Comm_GainPattern` | same |
-
-Every other component above is ported and passes its own tests. The dymos4 integration tests
-that were `expectedFailure` on `OM4_NEEDS.md` #1 now pass, with om4 at 3dc1ebd1 or later.
+Nothing is blocked. The three table components need om4 PR #404 (`OM4_NEEDS.md` #3), which
+CADRE uses from the `../om4-pr404.git` worktree until it merges (ARCHITECTURE, Environment).
+Every component above is ported and passes its own tests.
 
 ## Not started
 

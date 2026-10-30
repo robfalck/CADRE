@@ -53,7 +53,7 @@ bound them. A fresh solve picks jax/jaxlib 0.12.0.1, and asdex 0.5.2 (the latest
   structlog, jax, asdex, ...) with bounds in om4's `pyproject.toml`, and upper-bound jax until
   asdex supports 0.12.
 
-## 3. No structured-grid (N-D table) interpolation component
+## 3. No structured-grid (N-D table) interpolation component — met by om4 PR #404 (in review)
 
 CADRE's solar model interpolates a table of exposed area on a 3-D grid (fin angle 10 x azimuth
 73 x elevation 37) for 84 outputs (7 cells on each of 12 panels), with derivatives with respect
@@ -68,10 +68,12 @@ interpolation methods (`interp_methods.py`), a 1-D `SplineComp` and an unstructu
   `Comm_GainPattern` (`CADRE/comm.py`, a 2-D table of antenna gain in azimuth and elevation) and
   `Power_CellVoltage` (`CADRE/power.py`, a 3-D table of cell voltage in temperature, exposed area
   and current).
-- **Meanwhile:** those three components are not ported (blocked). Their consumers
-  (`ThermalTemperatureComp`, `CommBitRateComp`, `SolarPowerComp`) are, and take the table
-  outputs as inputs. Their tables are ready: `CADRE/tables.py` provides each as the legacy MBI
-  fit sampled on a grid for cubic interpolation (ARCHITECTURE ADL-007).
+- **Meanwhile:** CADRE works against om4 `main` with PR #404 merged, in the worktree
+  `../om4-pr404.git` (ARCHITECTURE, Environment), on the expectation that the PR merges soon.
+  The three are ported as `ExposedAreaGroup`, `CellVoltageGroup` and `GainPatternGroup`,
+  interpolating the tables of `CADRE/tables.py` (the legacy MBI fits sampled for grid
+  interpolation, ADL-007), and their tests are not marked `expectedFailure`. On plain om4 `main`
+  their modules (`solar_dymos`, `power_dymos`, `comm_dymos`) do not import.
 - **In review:** OpenMDAO/om4 PR #404 (dwmunster, `feat/metamodel_1`, open as of 2026-10-29)
   adds `StructuredMetaModelComp`, which meets this need: N-D rectilinear grids, a trailing value
   shape on each output, `vec_size` points with node-diagonal partials, and `cubic`, `lagrange3`,

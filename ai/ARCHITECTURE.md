@@ -26,6 +26,7 @@ CADRE.
 | `CADRE/thermal_dymos.py` | Fin and body temperature rates (om4, JAX) |
 | `CADRE/power_dymos.py` | Solar and battery power (om4, JAX) |
 | `CADRE/comm_dymos.py` | Ground-station geometry, line of sight and bit rate (om4, JAX) |
+| `CADRE/solar_dymos.py` | Exposed area of the solar cells, interpolated (om4) |
 | `CADRE/tables.py` | The solar exposed area, cell voltage and antenna gain tables, smoothed as the legacy MBI fits and sampled for grid interpolation (ADL-007) |
 | `CADRE/testing_utils.py` | `wrap` and `assert_partials_ok` for component tests |
 | `CADRE/*.py`, `CADRE/test/` (other than the above) | The legacy OpenMDAO 2.x model with its own RK4 integrator. Not ported yet, not run by `pixi run test` |
@@ -35,7 +36,11 @@ CADRE.
 ## Environment
 
 pixi, mirroring dymos4: `pixi install`, `pixi run test`, `pixi run lint`. om4 and dymos4 are
-installed editable from the sibling checkouts `../om4.git` and `../dymos4.git`.
+installed editable from sibling checkouts: dymos4 from `../dymos4.git` (`main`), and om4, until
+OpenMDAO/om4 PR #404 merges, from the worktree `../om4-pr404.git` (branch `main-pr404`: om4
+`main` with the PR merged). To refresh it, in `../om4.git`: `git fetch upstream main
+pull/404/head:pr-404`, then in `../om4-pr404.git`: `git merge upstream/main pr-404`. When the PR
+merges, point `pixi.toml` back at `../om4.git` and remove the worktree.
 
 ---
 

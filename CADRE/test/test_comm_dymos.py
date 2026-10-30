@@ -14,7 +14,8 @@ from CADRE.comm_dymos import (CommAntRotationComp, CommAntRotationMtxComp, CommB
                               CommDistanceComp, CommEarthsSpinComp, CommEarthsSpinMtxComp,
                               CommGSPosECIComp, CommGSPosEarthComp, CommLOSComp,
                               CommVectorAntComp, CommVectorBodyComp, CommVectorECIComp,
-                              CommVectorSphericalComp, Re)
+                              CommVectorSphericalComp, GainPatternGroup, Re)
+from CADRE.test.test_tables import CASE, LEGACY, assert_close_to_range
 from CADRE.testing_utils import assert_partials_ok, wrap
 
 N = 4
@@ -200,6 +201,22 @@ class TestCommGeometryChain(unittest.TestCase):
         p.run_model()
         assert_allclose(p.get_val('GSdist'), [500.])
         assert_allclose(p.get_val('CommLOS'), [1.0])
+
+
+
+class TestGainPatternGroup(unittest.TestCase):
+
+    def _run_legacy(self):
+        nodes = slice(0, None, 100)
+        vals = {k: LEGACY[CASE + k][nodes] for k in ('azimuthGS', 'elevationGS')}
+        return _run(GainPatternGroup(num_nodes=vals['azimuthGS'].size), vals), nodes
+
+    def test_matches_legacy(self):
+        p, nodes = self._run_legacy()
+        assert_close_to_range(p.get_val('gain'), LEGACY[CASE + 'gain'][nodes], 5e-4)
+
+    def test_partials(self):
+        assert_partials_ok(self._run_legacy()[0].check_partials(differentiator='cs'))
 
 
 if __name__ == '__main__':

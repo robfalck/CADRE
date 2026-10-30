@@ -41,8 +41,9 @@ python = "3.13.*"
 [pypi-dependencies]
 # CADRE itself, installed editable from this repo.
 CADRE = { path = ".", editable = true }
-# OpenMDAO 4 and dymos4, installed editable from sibling checkouts.
-om4 = { path = "../om4.git", editable = true }
+# OpenMDAO 4 and dymos4, installed editable from sibling checkouts. om4 is the ../om4-pr404.git
+# worktree (om4 main with OpenMDAO/om4 PR #404 merged) until the PR merges; then ../om4.git.
+om4 = { path = "../om4-pr404.git", editable = true }
 dymos4 = { path = "../dymos4.git", editable = true }
 # om4 dependencies
 nicegui = "*"
@@ -62,5 +63,5 @@ env = { JAX_PLATFORMS = "cpu" }
 [tasks]
 # Only the om4/dymos4 ports are tested here; the legacy OpenMDAO 2.x model
 # (CADRE/*.py at the top level and CADRE/test) still needs classic OpenMDAO.
-test = "testflo CADRE/attitude_dymos CADRE/orbital_equations CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py CADRE/test/test_battery_dymos.py CADRE/test/test_thermal_dymos.py CADRE/test/test_power_dymos.py CADRE/test/test_comm_dymos.py CADRE/test/test_tables.py -f"
-lint = "ruff check CADRE/attitude_dymos CADRE/orbital_equations CADRE/reactionwheel_dymos.py CADRE/sun_dymos.py CADRE/battery_dymos.py CADRE/thermal_dymos.py CADRE/power_dymos.py CADRE/comm_dymos.py CADRE/tables.py CADRE/testing_utils.py CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py CADRE/test/test_battery_dymos.py CADRE/test/test_thermal_dymos.py CADRE/test/test_power_dymos.py CADRE/test/test_comm_dymos.py CADRE/test/test_tables.py"
+test = "testflo CADRE/attitude_dymos CADRE/orbital_equations CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py CADRE/test/test_battery_dymos.py CADRE/test/test_thermal_dymos.py CADRE/test/test_power_dymos.py CADRE/test/test_comm_dymos.py CADRE/test/test_tables.py CADRE/test/test_solar_dymos.py -f"
+lint = "ruff check CADRE/attitude_dymos CADRE/orbital_equations CADRE/reactionwheel_dymos.py CADRE/sun_dymos.py CADRE/battery_dymos.py CADRE/thermal_dymos.py CADRE/power_dymos.py CADRE/comm_dymos.py CADRE/solar_dymos.py CADRE/tables.py CADRE/testing_utils.py CADRE/test/test_reactionwheel_dymos.py CADRE/test/test_sun_dymos.py CADRE/test/test_battery_dymos.py CADRE/test/test_thermal_dymos.py CADRE/test/test_power_dymos.py CADRE/test/test_comm_dymos.py CADRE/test/test_tables.py CADRE/test/test_solar_dymos.py"

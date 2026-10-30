@@ -10,17 +10,22 @@ Earth-fixed, O_AB takes antenna vectors to body.
 The legacy RK4-integrated data downloaded (``Comm_DataDownloaded``) is a dymos4 state ``Data``
 here, whose rate is the bit rate ``Dr`` (ADL-006).
 
-Not ported yet: ``Comm_GainPattern``, which interpolates the antenna gain table and is blocked by
-ai/OM4_NEEDS.md #3. ``CommBitRateComp`` takes the gain as an input.
+The antenna gain is interpolated from ``antenna_gain_table()``, the legacy MBI fit of the gain
+pattern (ADL-007), with om4's ``StructuredMetaModelComp`` (OpenMDAO/om4 PR #404,
+ai/OM4_NEEDS.md #3).
 """
 import jax.numpy as jnp
 import numpy as np
-from pydantic import Field
+from pydantic import Field, model_validator
+from pydantic_core import PydanticUndefined
 
-from om4.api import InputVar, JaxExplicitComp, OutputVar
+from om4.api import Group, InputVar, JaxExplicitComp, OutputVar, StructuredMetaModelComp
+from om4.core.system import System
+from om4.utils.polymorphic import Polymorphic
 
 from CADRE.attitude_dymos.quaternion_attitude_comp import _dcm_from_quaternion
 from CADRE.sun_dymos import azimuth_elevation
+from CADRE.tables import antenna_gain_table
 
 #: Earth's radius, km.
 Re = 6378.137
@@ -397,3 +402,51 @@ class CommBitRateComp(JaxExplicitComp):
         S2 = jnp.where(jnp.abs(GSdist) > 1e-10, GSdist * 1e3, 1e-10)
         outputs['Dr'] = (statics['alpha'] * inputs['P_comm'] * inputs['gain'] *
                          inputs['CommLOS'] / S2 ** 2)
+
+
+def _gain_pattern_subsystems(num_nodes, method):
+    nn = num_nodes
+    grid, gain = antenna_gain_table()
+    return {
+        'table': StructuredMetaModelComp(
+            grid={'azimuthGS': grid['azimuth'], 'elevationGS': grid['elevation']},
+            training_outputs={'gain': gain}, method=method, vec_size=nn,
+            inputs={'azimuthGS': InputVar(shape=(nn,), units='rad',
+                                          desc='Azimuth angle from satellite to ground station in '
+                                               'the antenna frame over time'),
+                    'elevationGS': InputVar(shape=(nn,), units='rad',
+                                            desc='Elevation angle from satellite to ground station in '
+                                                 'the antenna frame over time')},
+            outputs={'gain': OutputVar(shape=(nn,), units='unitless', desc='Transmitter gain over time')},
+            promotes_inputs=['azimuthGS', 'elevationGS'], promotes_outputs=['gain']),
+    }
+
+
+class GainPatternGroup(Group):
+    """
+    Transmitter gain from the antenna-frame azimuth and elevation (``Comm_GainPattern``).
+
+    The gain is interpolated from ``antenna_gain_table()``, the legacy MBI fit of the gain
+    pattern, to about 2e-4 of the range. The legacy component first wrapped the angles onto the
+    table with ``fixangles``; ``CommVectorSphericalComp`` already gives the azimuth on
+    [0, 2 pi) and the elevation on [0, pi], inside the table, so there is no wrap here.
+
+    ``method`` is the ``StructuredMetaModelComp`` method. The default, ``'lagrange3'``, is
+    complex-step safe, as CADRE's ODE checks need; ``'cubic'`` is more accurate (1e-4) and
+    smoother, but not complex-step safe.
+    """
+    num_nodes: int = Field(default=1)
+    method: str = Field(default='lagrange3', description='Interpolation method of the table.')
+
+    # Derived from the fields above; not part of the constructor API.
+    subsystems: dict[str, Polymorphic[System]] = Field(default=PydanticUndefined, init=False)
+
+    @model_validator(mode='before')
+    @classmethod
+    def _build_from_fields(cls, data):
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        data['subsystems'] = _gain_pattern_subsystems(data.get('num_nodes', 1),
+                                                      data.get('method', 'lagrange3'))
+        return data
