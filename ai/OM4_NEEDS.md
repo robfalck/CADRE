@@ -98,21 +98,313 @@ residual to the change in outputs over the sweep. When the error comes before an
 changed, that residual is exactly zero and the solver reports `converged`, with the outputs
 downstream of the failing component left at stale or default values.
 
-OpenMDAO 3 has the same option and default, but catches the error per subsystem: in
-`Solver._gs_iter` the `try` is inside the loop over subsystems, so only the failing subsystem is
-skipped and the rest of the sweep still runs. om4's `try` wraps the whole sweep
-(`self._run_subsystems(exec_node)`), so one error skips every subsystem after it. Under OpenMDAO 3
-a swallowed error leaves one subsystem stale and a false convergence needs everything else to have
-converged already; under om4 a single early error is enough.
+OpenMDAO 3 has the same option and default but differs in two ways. Its first iteration runs in
+`_iter_initialize` (`NonlinearBlockGS._run_apply`), which does not catch the error, so a failure on
+the first sweep is raised. Later iterations go through `Solver._gs_iter`, where the `try` is inside
+the loop over subsystems, so only the failing subsystem is skipped and the rest of the sweep runs.
+om4's `try` wraps the whole sweep (`self._run_subsystems(exec_node)`), on every iteration. In a
+cycle `y1 = 0.5 y2 + 1`, `y2 = 0.5 y1` (and a three-component variant with a feedback into the
+component after the failing one), with A raising:
+
+| A raises | om4 | OpenMDAO 3.43 |
+|---|---|---|
+| on the first sweep | "converged in 1 iterations" at the starting point | raises `AnalysisError` |
+| once, later, in the two-component loop | false convergence | false convergence too, at the same point (B's input has not changed, so neither does its output) |
+| once, later, with a pending update after A | false convergence | converges to the solution |
+
+So OpenMDAO 3 is not immune, but it raises on the first sweep and recovers whenever the rest of the
+sweep has work to do; om4 reports convergence in all three.
+
+**Reproduction.** Each script runs on its own; the om4 ones need only om4 (checked on `main` at
+333db9d4), the OpenMDAO 3 ones only OpenMDAO (checked on 3.43.0).
+
+Two components; `python om4_nlbgs_analysiserror.py first` or `... later`:
+
+```python
+"""
+om4: an AnalysisError swallowed by NonlinearBlockGS reports false convergence.
+
+A and B form a cycle, y1 = 0.5*y2 + 1 and y2 = 0.5*y1, solved by y1 = 4/3, y2 = 2/3, under
+NonlinearBlockGS with the default reraise_child_analysiserror=False. A raises AnalysisError:
+
+- scenario "first": while y2 < 0 (as a table does outside its grid), starting from y2 = -1, so A
+  fails on the first sweep;
+- scenario "later": once, on its second evaluation, starting from a valid y2 = 1.
+
+om4 abandons the whole sweep when A raises, so B does not run, the outputs do not change, the
+residual (the change in outputs over the sweep) is exactly 0, and the solver reports convergence
+at a point that is not a solution.
+
+Run: python om4_nlbgs_analysiserror.py first|later
+"""
+import sys
+
+import numpy as np
+
+import om4.api as om
+from om4.core.analysis_error import AnalysisError
+from om4.core.explicitcomp import ExplicitComponent
+from om4.derivatives.partials_spec import PartialsSpec
+
+SCENARIO = sys.argv[1] if len(sys.argv) > 1 else "first"
+calls = {"A": 0}
+
+
+class A(ExplicitComponent):
+    inputs: dict[str, om.InputVar] = {"y2": om.InputVar(shape=(1,), val=0.0)}
+    outputs: dict[str, om.OutputVar] = {"y1": om.OutputVar(shape=(1,), val=1.0)}
+    partials: list[PartialsSpec] = [PartialsSpec(of="y1", wrt="y2", val=0.5)]
+
+    def compute_outputs(self, inputs, outputs):
+        calls["A"] += 1
+        if SCENARIO == "first" and np.any(inputs["y2"] < 0.0):
+            raise AnalysisError(f"A: y2 = {inputs['y2']} is below 0")
+        if SCENARIO == "later" and calls["A"] == 2:
+            raise AnalysisError("A: failed on its second evaluation")
+        outputs["y1"] = 0.5 * inputs["y2"] + 1.0
+
+
+class B(ExplicitComponent):
+    inputs: dict[str, om.InputVar] = {"y1": om.InputVar(shape=(1,), val=0.0)}
+    outputs: dict[str, om.OutputVar] = {"y2": om.OutputVar(shape=(1,), val=1.0)}
+    partials: list[PartialsSpec] = [PartialsSpec(of="y2", wrt="y1", val=0.5)]
+
+    def compute_outputs(self, inputs, outputs):
+        outputs["y2"] = 0.5 * inputs["y1"]
+
+
+prob = om.Problem(model=om.Group(
+    subsystems={"A": A(), "B": B()},
+    connections=[om.Connection(src="A.y1", tgt="B.y1"), om.Connection(src="B.y2", tgt="A.y2")],
+    nonlinear_solver=om.NonlinearBlockGS(maxiter=50, iprint=2, atol=1e-10, rtol=1e-10),
+))
+prob.set_val("B.y2", -1.0 if SCENARIO == "first" else 1.0)
+prob.run_model()
+print(f"om4, scenario {SCENARIO!r}: y1 = {prob.get_val('A.y1')[0]:.6f}, "
+      f"y2 = {prob.get_val('B.y2')[0]:.6f} (solution y1 = 1.333333, y2 = 0.666667)")
+```
+
+```
+$ python om4_nlbgs_analysiserror.py first
+NonlinearBlockGS on root started atol=1e-10, rtol=1e-10
+iter   1 | abs=0.00e+00 rel=0.00e+00
+NonlinearBlockGS on root converged in 1 iterations
+om4, scenario 'first': y1 = 1.000000, y2 = -1.000000 (solution y1 = 1.333333, y2 = 0.666667)
+
+$ python om4_nlbgs_analysiserror.py later
+iter   1 | abs=5.59e-01 rel=1.00e+00
+iter   2 | abs=0.00e+00 rel=0.00e+00
+NonlinearBlockGS on root converged in 2 iterations
+om4, scenario 'later': y1 = 1.500000, y2 = 0.750000 (solution y1 = 1.333333, y2 = 0.666667)
+```
+
+Three components, with a feedback into the component after the failing one (solution
+`y1, y2, y3 = 1.166667, 0.666667, 0.333333`):
+
+```python
+"""om4: A fails once (2nd call) in a cycle A -> B -> C, with B also fed back by C."""
+import om4.api as om
+from om4.core.analysis_error import AnalysisError
+from om4.core.explicitcomp import ExplicitComponent
+from om4.derivatives.partials_spec import PartialsSpec
+
+calls = {"A": 0}
+
+
+class A(ExplicitComponent):
+    inputs: dict[str, om.InputVar] = {"y3": om.InputVar(shape=(1,), val=0.0)}
+    outputs: dict[str, om.OutputVar] = {"y1": om.OutputVar(shape=(1,), val=0.0)}
+    partials: list[PartialsSpec] = [PartialsSpec(of="y1", wrt="y3", val=0.5)]
+
+    def compute_outputs(self, inputs, outputs):
+        calls["A"] += 1
+        if calls["A"] == 2:
+            raise AnalysisError("A: failed on its second evaluation")
+        outputs["y1"] = 0.5 * inputs["y3"] + 1.0
+
+
+class B(ExplicitComponent):
+    inputs: dict[str, om.InputVar] = {"y1": om.InputVar(shape=(1,), val=0.0),
+                                      "y3": om.InputVar(shape=(1,), val=0.0)}
+    outputs: dict[str, om.OutputVar] = {"y2": om.OutputVar(shape=(1,), val=0.0)}
+    partials: list[PartialsSpec] = [PartialsSpec(of="y2", wrt="y1", val=0.5),
+                                    PartialsSpec(of="y2", wrt="y3", val=0.25)]
+
+    def compute_outputs(self, inputs, outputs):
+        outputs["y2"] = 0.5 * inputs["y1"] + 0.25 * inputs["y3"]
+
+
+class C(ExplicitComponent):
+    inputs: dict[str, om.InputVar] = {"y2": om.InputVar(shape=(1,), val=0.0)}
+    outputs: dict[str, om.OutputVar] = {"y3": om.OutputVar(shape=(1,), val=0.0)}
+    partials: list[PartialsSpec] = [PartialsSpec(of="y3", wrt="y2", val=0.5)]
+
+    def compute_outputs(self, inputs, outputs):
+        outputs["y3"] = 0.5 * inputs["y2"]
+
+
+prob = om.Problem(model=om.Group(
+    subsystems={"A": A(), "B": B(), "C": C()},
+    connections=[om.Connection(src="A.y1", tgt="B.y1"), om.Connection(src="C.y3", tgt="B.y3"),
+                 om.Connection(src="B.y2", tgt="C.y2"), om.Connection(src="C.y3", tgt="A.y3")],
+    nonlinear_solver=om.NonlinearBlockGS(maxiter=50, iprint=2, atol=1e-10, rtol=1e-10),
+))
+prob.run_model()
+y = [prob.get_val(n)[0] for n in ("A.y1", "B.y2", "C.y3")]
+print("om4: y1, y2, y3 = " + ", ".join(f"{v:.6f}" for v in y))
+```
+
+```
+$ python om4_three.py
+iter   1 | abs=1.15e+00 rel=1.00e+00
+iter   2 | abs=0.00e+00 rel=0.00e+00
+NonlinearBlockGS on root converged in 2 iterations
+om4: y1, y2, y3 = 1.000000, 0.500000, 0.250000
+```
+
+The same problems in OpenMDAO 3, for comparison:
+
+```python
+"""
+OpenMDAO 3 version of om4_nlbgs_analysiserror.py: the same cycle, scenarios and solver.
+
+- scenario "first": the first iteration runs inside _iter_initialize/_run_apply, which does not
+  catch AnalysisError, so it is raised to the caller.
+- scenario "later": Solver._gs_iter catches the error per subsystem, so only A is skipped that
+  sweep, B still runs, and the solver goes on to the true solution.
+
+Run: python om3_nlbgs_analysiserror.py first|later
+"""
+import sys
+
+import numpy as np
+import openmdao
+import openmdao.api as om
+from openmdao.core.analysis_error import AnalysisError
+
+SCENARIO = sys.argv[1] if len(sys.argv) > 1 else "first"
+calls = {"A": 0}
+
+
+class A(om.ExplicitComponent):
+    def setup(self):
+        self.add_input("y2", 0.0)
+        self.add_output("y1", 1.0)
+        self.declare_partials("y1", "y2", val=0.5)
+
+    def compute(self, inputs, outputs):
+        calls["A"] += 1
+        if SCENARIO == "first" and np.any(inputs["y2"] < 0.0):
+            raise AnalysisError(f"A: y2 = {inputs['y2']} is below 0")
+        if SCENARIO == "later" and calls["A"] == 2:
+            raise AnalysisError("A: failed on its second evaluation")
+        outputs["y1"] = 0.5 * inputs["y2"] + 1.0
+
+
+class B(om.ExplicitComponent):
+    def setup(self):
+        self.add_input("y1", 0.0)
+        self.add_output("y2", 1.0)
+        self.declare_partials("y2", "y1", val=0.5)
+
+    def compute(self, inputs, outputs):
+        outputs["y2"] = 0.5 * inputs["y1"]
+
+
+prob = om.Problem()
+prob.model.add_subsystem("A", A())
+prob.model.add_subsystem("B", B())
+prob.model.connect("A.y1", "B.y1")
+prob.model.connect("B.y2", "A.y2")
+prob.model.nonlinear_solver = om.NonlinearBlockGS(maxiter=50, iprint=2, atol=1e-10, rtol=1e-10)
+prob.setup()
+prob.set_val("B.y2", -1.0 if SCENARIO == "first" else 1.0)
+try:
+    prob.run_model()
+except AnalysisError as err:
+    print(f"OpenMDAO {openmdao.__version__}, scenario {SCENARIO!r}: run_model raised "
+          f"AnalysisError: {str(err).splitlines()[-1]}")
+else:
+    print(f"OpenMDAO {openmdao.__version__}, scenario {SCENARIO!r}: y1 = {prob.get_val('A.y1')[0]:.6f}, "
+          f"y2 = {prob.get_val('B.y2')[0]:.6f} (solution y1 = 1.333333, y2 = 0.666667)")
+```
+
+```
+$ python om3_nlbgs_analysiserror.py first
+OpenMDAO 3.43.0, scenario 'first': run_model raised AnalysisError: 'A' <class A>: Error calling compute(), A: y2 = [-1.] is below 0
+
+$ python om3_nlbgs_analysiserror.py later
+NL: NLBGS 1 ; 0.559016994 1
+NL: NLBGS 2 ; 0 0
+NL: NLBGS Converged
+OpenMDAO 3.43.0, scenario 'later': y1 = 1.500000, y2 = 0.750000 (solution y1 = 1.333333, y2 = 0.666667)
+```
+
+```python
+"""OpenMDAO 3 version of om4_three.py."""
+import openmdao
+import openmdao.api as om
+from openmdao.core.analysis_error import AnalysisError
+
+calls = {"A": 0}
+
+
+class A(om.ExplicitComponent):
+    def setup(self):
+        self.add_input("y3", 0.0); self.add_output("y1", 0.0); self.declare_partials("y1", "y3", val=0.5)
+
+    def compute(self, inputs, outputs):
+        calls["A"] += 1
+        if calls["A"] == 2:
+            raise AnalysisError("A: failed on its second evaluation")
+        outputs["y1"] = 0.5 * inputs["y3"] + 1.0
+
+
+class B(om.ExplicitComponent):
+    def setup(self):
+        self.add_input("y1", 0.0); self.add_input("y3", 0.0); self.add_output("y2", 0.0)
+        self.declare_partials("y2", "y1", val=0.5); self.declare_partials("y2", "y3", val=0.25)
+
+    def compute(self, inputs, outputs):
+        outputs["y2"] = 0.5 * inputs["y1"] + 0.25 * inputs["y3"]
+
+
+class C(om.ExplicitComponent):
+    def setup(self):
+        self.add_input("y2", 0.0); self.add_output("y3", 0.0); self.declare_partials("y3", "y2", val=0.5)
+
+    def compute(self, inputs, outputs):
+        outputs["y3"] = 0.5 * inputs["y2"]
+
+
+prob = om.Problem()
+for name, comp in (("A", A()), ("B", B()), ("C", C())):
+    prob.model.add_subsystem(name, comp)
+prob.model.connect("A.y1", "B.y1"); prob.model.connect("C.y3", "B.y3")
+prob.model.connect("B.y2", "C.y2"); prob.model.connect("C.y3", "A.y3")
+prob.model.nonlinear_solver = om.NonlinearBlockGS(maxiter=50, iprint=2, atol=1e-10, rtol=1e-10)
+prob.setup()
+prob.run_model()
+y = [prob.get_val(n)[0] for n in ("A.y1", "B.y2", "C.y3")]
+print(f"OpenMDAO {openmdao.__version__}: y1, y2, y3 = " + ", ".join(f"{v:.6f}" for v in y))
+```
+
+```
+$ python om3_three.py
+NL: NLBGS 17 ; 4.36557457e-10 3.81058589e-10
+NL: NLBGS 18 ; 1.09139364e-10 9.52646472e-11
+NL: NLBGS Converged
+OpenMDAO 3.43.0: y1, y2, y3 = 1.166667, 0.666667, 0.333333
+```
 
 - **Hit by:** a CADRE design point under Picard (`DYMOS4_NEEDS.md` #3): a table component raised
   `AnalysisError` for a temperature below its grid, and NonlinearBlockGS printed
   `abs=0.00e+00 ... converged in 19 iterations` with inconsistent multiple-shooting anchors.
 - **Meanwhile:** nothing; CADRE no longer uses Picard. Diagnosed with
   `reraise_child_analysiserror=True`.
-- **Fix:** catch the error per subsystem, as OpenMDAO 3 does, so the rest of the sweep still runs;
-  and treat a swallowed `AnalysisError` as a failed iteration, so it can never count as
-  convergence (or re-raise by default).
+- **Fix:** treat a swallowed `AnalysisError` as a failed iteration, so it can never count as
+  convergence (OpenMDAO 3 lacks this too), or re-raise by default; and catch the error per
+  subsystem, as OpenMDAO 3 does, so the rest of the sweep still runs.
 
 ## 5. `Problem.set_val` on a missing variable raises an opaque `TypeError`
 
